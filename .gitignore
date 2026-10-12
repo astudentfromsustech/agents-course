@@ -1,0 +1,9 @@
+.DS_Store
+**/.DS_Store
+
+# Codex research transcripts — raw tool logs, not course content
+research/logs/
+
+# scratch
+*.bak
+*.tmp
