@@ -8,7 +8,7 @@ Seven chapters and seven exercises on building LLM agents, written around one se
 Every hard problem in the field is a consequence of that trade, and every chapter is one of
 those consequences.
 
-**Read it:** https://astudentfromsustech.github.io/REPO_NAME/
+**Read it:** https://astudentfromsustech.github.io/agents-course/
 
 ## Chapters
 
