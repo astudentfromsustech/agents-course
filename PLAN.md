@@ -55,7 +55,20 @@ Re-run it after writing a chapter, and add the new chapter to the `CHAPTERS` reg
 script. It is idempotent and rewrites only the block between the `TOC:START`/`TOC:END` markers — never
 hand-edit that block.
 
-It also renders a **practice** section in the sidebar from its `PRACTICE` registry, so every
+Notebooks are validated separately, and this check exists because the failure already shipped once:
+
+```
+python3 resources/_check_notebooks.py          # report
+python3 resources/_check_notebooks.py --fix    # repair newlines in place
+```
+
+🔴 **nbformat concatenates a cell's `source` list with NO separator**, so every line must carry its
+own trailing `\n`. A list built with `split("\n")` loses them: Colab renders the notebook as one
+run-together line and the code does not parse — while any check that re-joins with `"\n"` reports
+it healthy. The checker joins with `""` and compiles each code cell, which is how the kernel reads
+it. **Verify the way the consumer reads it, not the way you wrote it.**
+
+The builder also renders a **practice** section in the sidebar from its `PRACTICE` registry, so every
 chapter can jump straight into a runnable notebook (Colab) or a lab on GitHub — add a row there
 when a new exercise lands. And it makes **every external link open in a new tab** (`target="_blank"` +
 `rel="noopener noreferrer"`), leaving internal chapter navigation in place, so a reader never loses the
