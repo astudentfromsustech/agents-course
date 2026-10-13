@@ -3,7 +3,18 @@
 For after you have watched the lectures and still want the mechanism in your hands.
 Pure `numpy`, no PyTorch, no GPU, no downloads.
 
+**Three ways in, in the order most people want them:**
+
+| | | |
+|---|---|---|
+| **see it** | [`walkthrough.ipynb`](walkthrough.ipynb) — [open in Colab](https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p0_attention/walkthrough.ipynb) | run a cell, read the numbers, change one, run again |
+| | `python3 walkthrough.py` | the same thing in the terminal, pausing at each step |
+| **build it** | `python3 attention_lab.py` | three TODOs, checked against a longhand reference |
+
 ```bash
+python3 walkthrough.py                # step through, Enter between steps
+python3 walkthrough.py --all          # straight through
+python3 walkthrough.py --step 7       # revisit one step
 python3 attention_lab.py              # implement the TODOs, run until green
 python3 attention_lab.py --solutions  # see what passing looks like
 ```

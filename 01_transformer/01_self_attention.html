@@ -363,8 +363,8 @@
     <thead><tr><th>Resource</th><th>What you do</th><th>What it fixes</th></tr></thead>
     <tbody>
       <tr>
-        <td><b>p0 · attention by hand</b><br><span class="cm">in this repo · <code>practice/p0_attention/</code></span></td>
-        <td>Implement single-head, multi-head and masked attention in numpy. A harness checks you against your own longhand loop.</td>
+        <td><b>p0 · attention by hand</b><br><span class="cm">in this repo · <a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p0_attention/walkthrough.ipynb">open the notebook in Colab</a></span></td>
+        <td><b>See it, then build it.</b> A notebook steps through one attention layer with numbers small enough to check by hand — change a value, re-run, watch the pattern move. Then <code>attention_lab.py</code> makes you implement single-head, multi-head and masked attention yourself, checked against your own longhand loop.</td>
         <td><b>The mechanism, in your hands.</b> Written for exactly this point — you have watched the lectures and want to <i>do</i> it. It makes you prove the two things slides cannot: that <b>heads never mix</b> (perturb one head's keys, the others must come out bit-identical) and that <b>masking makes the past independent of the future</b> (rewrite later tokens, earlier outputs must not move). It also <i>measures</i> why <code>1/√d_k</code> exists instead of asserting it.</td>
       </tr>
       <tr>
