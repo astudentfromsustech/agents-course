@@ -357,7 +357,7 @@
 
 
 <div class="tryit">
-  <p><b>Go and run one.</b> Attention is the rare idea where the interactive explanations are genuinely better than the prose — including this page's. Six, ordered by how much work they ask of you. The first is a hands-on lab in this repo; the second is the source of this page's own figures. All verified live 2026-10-09.</p>
+  <p><b>Go and run one.</b> Attention is the rare idea where the interactive explanations are genuinely better than the prose — including this page's. Seven, ordered by how much work they ask of you. The first two are hands-on labs in this repo; the third is the source of this page's own figures. All verified live 2026-10-09.</p>
 
   <div class="tw" style="margin:14px 0 4px"><table>
     <thead><tr><th>Resource</th><th>What you do</th><th>What it fixes</th></tr></thead>
@@ -366,6 +366,11 @@
         <td><b>p0 · attention by hand</b><br><span class="cm">in this repo · <code>practice/p0_attention/</code></span></td>
         <td>Implement single-head, multi-head and masked attention in numpy. A harness checks you against your own longhand loop.</td>
         <td><b>The mechanism, in your hands.</b> Written for exactly this point — you have watched the lectures and want to <i>do</i> it. It makes you prove the two things slides cannot: that <b>heads never mix</b> (perturb one head's keys, the others must come out bit-identical) and that <b>masking makes the past independent of the future</b> (rewrite later tokens, earlier outputs must not move). It also <i>measures</i> why <code>1/√d_k</code> exists instead of asserting it.</td>
+      </tr>
+      <tr>
+        <td><b>p1 · heads learn an algorithm</b><br><span class="cm">in this repo · <code>practice/p1_induction_heads/</code> · GPU, ~19 s</span></td>
+        <td>Train a 41k-parameter transformer until it discovers a circuit, then score every head: content-matching vs positional reflex.</td>
+        <td><b>What multi-head is FOR.</b> p0 proves heads cannot mix; this shows why that matters — the model splits one algorithm across two layers, a <b>previous-token head</b> in layer 0 feeding <b>induction heads</b> in layer 1, and neither half works alone. It also carries the lesson that cost me a wrong result: the first version scored every head at 0.9 because a fixed-period task lets a positional reflex masquerade as content matching. <b>The control column is the exercise.</b></td>
       </tr>
       <tr>
         <td><a target="_blank" rel="noopener noreferrer" href="https://speech.ee.ntu.edu.tw/~hylee/ml/2021-spring.php"><b>Hung-yi Lee — Machine Learning</b></a><br><span class="cm">NTU · self-attention <a target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/watch?v=hYdO9CscNes">(上)</a> <a target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/watch?v=gmsMY5kc-zw">(下)</a> · <a target="_blank" rel="noopener noreferrer" href="https://speech.ee.ntu.edu.tw/~hylee/ml/ml2021-course-data/self_v7.pdf">slides</a></span></td>

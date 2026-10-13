@@ -7,3 +7,8 @@ research/logs/
 # scratch
 *.bak
 *.tmp
+
+# training artefacts regenerate in ~19s
+practice/*/loss.png
+practice/*/heads.png
+practice/**/__pycache__/
