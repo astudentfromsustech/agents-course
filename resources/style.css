@@ -288,3 +288,20 @@ ul.toc-sec li.l3 a{padding-left:18px; font-size:12px}
 /* no room beside the 900px column — the in-page .docnav already covers navigation */
 @media(max-width:1300px){ .toc{display:none} }
 @media print{ .toc{display:none} }
+
+/* practice links in the contents sidebar */
+.toc-lab{font-family:var(--mono); font-size:10px; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--ink-3); margin:14px 0 6px; padding-top:11px; border-top:1px solid var(--line)}
+ul.toc-prac{list-style:none; margin:0; padding:0}
+ul.toc-prac > li{margin:0 0 1px}
+ul.toc-prac a{display:flex; gap:8px; align-items:baseline; text-decoration:none;
+  color:var(--ink-2); padding:5px 8px; border-radius:5px; line-height:1.35}
+ul.toc-prac a:hover{background:var(--code-bg); color:var(--accent)}
+ul.toc-prac i{font-style:normal; font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+  flex:none; min-width:17px}
+ul.toc-prac a:hover i{color:var(--accent)}
+ul.toc-prac span{flex:1}
+/* a glyph so the runnable notebook is distinguishable at a glance */
+ul.toc-prac li.nb a::after{content:"▶"; font-size:9px; color:var(--green); flex:none}
+ul.toc-prac li.gpu a::after{content:"▶"; font-size:9px; color:var(--green); flex:none}
+ul.toc-prac li.py a::after{content:"✎"; font-size:10px; color:var(--ink-3); flex:none}

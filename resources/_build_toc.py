@@ -34,6 +34,17 @@ def external_new_tab(src):
     return EXT_A.sub(lambda m: '<a target="_blank" rel="noopener noreferrer" %s>' % m.group(1), src)
 
 
+GH = "https://github.com/astudentfromsustech/agents-course/blob/main"
+COLAB = "https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main"
+
+# (tag, label, href, kind) — kind "nb" gets the notebook glyph and opens in Colab
+PRACTICE = [
+    ("p0", "attention, step by step", f"{COLAB}/practice/p0_attention/walkthrough.ipynb", "nb"),
+    ("p0", "write it yourself",       f"{GH}/practice/p0_attention/attention_lab.py",      "py"),
+    ("p1", "heads learn a circuit",   f"{GH}/practice/p1_induction_heads/",                "gpu"),
+]
+
+
 def slug(t):
     s = re.sub(r"<[^>]*>", "", t)
     s = html.unescape(s).lower()
@@ -87,7 +98,14 @@ def aside(page_rel, subs):
                 L.append(f'          <li class="l{lvl}"><a href="#{hid}">{html.escape(text)}</a></li>')
             L.append('        </ul>')
         L.append('      </li>')
-    L += ['    </ol>', '  </nav>', '</aside>', END]
+    L.append('    </ol>')
+    L.append('    <p class="toc-lab">practice</p>')
+    L.append('    <ul class="toc-prac">')
+    for tag, label, href, kind in PRACTICE:
+        L.append(f'      <li class="{kind}"><a href="{href}">'
+                 f'<i>{tag}</i><span>{label}</span></a></li>')
+    L.append('    </ul>')
+    L += ['  </nav>', '</aside>', END]
     return "\n".join(L)
 
 def build(check=False):
@@ -98,7 +116,6 @@ def build(check=False):
         if not os.path.exists(fp):
             print(f"  skip (missing)  {rel}"); continue
         src = orig = open(fp).read()
-        src = external_new_tab(src)
         page_rel = "" if rel == "agents.html" else rel
         src, hs = headings(src)
         subs = hs if page_rel else []
@@ -111,6 +128,8 @@ def build(check=False):
             if anchor not in src:
                 print(f"  SKIP (no .wrap) {rel}"); continue
             src = src.replace(anchor, anchor + "\n" + block, 1)
+
+        src = external_new_tab(src)   # after injection, so sidebar links are covered too
 
         up = "../" * page_rel.count("/")
         tag = f'<script src="{up}resources/toc.js" defer></script>'

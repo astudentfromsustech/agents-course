@@ -55,7 +55,9 @@ Re-run it after writing a chapter, and add the new chapter to the `CHAPTERS` reg
 script. It is idempotent and rewrites only the block between the `TOC:START`/`TOC:END` markers — never
 hand-edit that block.
 
-The same script also makes **every external link open in a new tab** (`target="_blank"` +
+It also renders a **practice** section in the sidebar from its `PRACTICE` registry, so every
+chapter can jump straight into a runnable notebook (Colab) or a lab on GitHub — add a row there
+when a new exercise lands. And it makes **every external link open in a new tab** (`target="_blank"` +
 `rel="noopener noreferrer"`), leaving internal chapter navigation in place, so a reader never loses the
 chapter by following a reference. Write plain `<a href="https://…">` in a chapter; the build adds the
 attributes. ⚠️ It rewrites the `<a>` tag, so a later script that string-matches on `<a href="https…"`
