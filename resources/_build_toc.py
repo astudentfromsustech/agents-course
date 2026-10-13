@@ -41,7 +41,8 @@ COLAB = "https://colab.research.google.com/github/astudentfromsustech/agents-cou
 PRACTICE = [
     ("p0", "attention, step by step", f"{COLAB}/practice/p0_attention/walkthrough.ipynb", "nb"),
     ("p0", "write it yourself",       f"{GH}/practice/p0_attention/attention_lab.py",      "py"),
-    ("p1", "heads learn a circuit",   f"{GH}/practice/p1_induction_heads/",                "gpu"),
+    ("p1", "heads learn a circuit",   f"{COLAB}/practice/p1_induction_heads/induction.ipynb", "nb"),
+    ("", "run it on your own Mac",     f"{GH}/practice/RUNNING.md",                          "doc"),
 ]
 
 

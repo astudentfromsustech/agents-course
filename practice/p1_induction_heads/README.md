@@ -3,10 +3,19 @@
 p0 built the attention forward pass by hand. This trains a tiny transformer until it
 discovers a circuit, then **measures which head learned what**. ~19 s on the Mac's GPU.
 
+**Two ways to run it, same code:**
+
+| | |
+|---|---|
+| [open in Colab](https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p1_induction_heads/induction.ipynb) | Google's GPU, nothing installed |
+| `bash ../start_local_runtime.sh` | Colab's interface driving **this Mac's GPU** — see [RUNNING.md](../RUNNING.md) |
+
 ```bash
 conda activate courses_self-attention
-python induction.py            # trains, scores every head, writes loss.png + heads.png
+python induction.py            # or just the script: trains, scores, writes loss.png + heads.png
 ```
+
+The notebook's first cell prints which device it found, and nothing else changes between them.
 
 Environment (created for this): conda env `courses_self-attention`, Python 3.12, torch 2.14.1
 on Metal/MPS. The model is 41k parameters — small enough to read, big enough to be real.

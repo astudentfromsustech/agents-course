@@ -29,8 +29,18 @@ for path in sorted(glob.glob("practice/**/*.ipynb", recursive=True)):
                 c["source"] = [l if l.endswith("\n") else l + "\n" for l in src[:-1]] + [src[-1].rstrip("\n")]
                 dirty = True
         if c["cell_type"] == "code":
+            # IPython magics (!cmd, %magic, %%cellmagic) are legal in a notebook but not
+            # in Python — IPython rewrites them before the kernel compiles anything.
+            # Blank them out, preserving indentation, so the rest still gets checked.
+            lines = []
+            for l in "".join(c["source"]).split("\n"):
+                stripped = l.lstrip()
+                if stripped.startswith(("!", "%")):
+                    lines.append(" " * (len(l) - len(stripped)) + "pass")
+                else:
+                    lines.append(l)
             try:
-                compile("".join(c["source"]), f"{path}:cell{i}", "exec")
+                compile("\n".join(lines), f"{path}:cell{i}", "exec")
             except SyntaxError as e:
                 problems.append(f"cell {i}: does NOT parse as the kernel reads it — {e.msg}")
 

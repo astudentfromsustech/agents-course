@@ -22,3 +22,8 @@ python -c "import torch; print(torch.backends.mps.is_available())"   # expect Tr
 ```
 
 On an M-series Mac this gives Metal/MPS acceleration with no CUDA and no extra setup.
+
+## Where it runs
+
+Colab, or this Mac, or Colab's interface driving this Mac's GPU — same notebook either way.
+See [RUNNING.md](RUNNING.md). The first cell of each notebook prints the device it found.

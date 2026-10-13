@@ -305,3 +305,4 @@ ul.toc-prac span{flex:1}
 ul.toc-prac li.nb a::after{content:"▶"; font-size:9px; color:var(--green); flex:none}
 ul.toc-prac li.gpu a::after{content:"▶"; font-size:9px; color:var(--green); flex:none}
 ul.toc-prac li.py a::after{content:"✎"; font-size:10px; color:var(--ink-3); flex:none}
+ul.toc-prac li.doc a::after{content:"↗"; font-size:9px; color:var(--ink-3); flex:none}
