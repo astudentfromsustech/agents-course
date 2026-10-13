@@ -63,13 +63,23 @@ step("the input", s1)
 
 # ── 2 ────────────────────────────────────────────────────────────────────────
 def s2(silent):
-    rng = np.random.default_rng(2)
-    Wq, Wk, Wv = (np.round(rng.normal(size=(d_model, d_model)) * 0.5, 1) for _ in range(3))
+    rng = np.random.default_rng(2)   # seeded -> reproducible; the 2 is just a label
+    scale = 0.5                      # try 3.0 and watch step 7 collapse onto one token
+    # three SEPARATE draws -- Wq = Wk = Wv would make every query match its own key
+    Wq, Wk, Wv = (np.round(rng.normal(size=(d_model, d_model)) * scale, 1) for _ in range(3))
     S.update(Wq=Wq, Wk=Wk, Wv=Wv)
     if silent: return
     print("\n  Three learned matrices. These are the ONLY parameters in attention.")
     print("  Same matrices applied to every token — attention has no per-position weights.")
     show("W_q", Wq); show("W_k", Wk); show("W_v", Wv)
+    print("\n  Reading that one line:")
+    print("    default_rng(2)        seeded, so these numbers are reproducible. 2 is arbitrary.")
+    print("    rng.normal(...)       a real model LEARNS these; random stands in for 'trained'.")
+    print("    size=(d_model,d_model)  X (4,6) @ W (6,6) -> (4,6): width in, same width out.")
+    print(f"    * {scale}                 keeps dot products small — see step 5. Try 3.0.")
+    print("    np.round(...,1)       cosmetic, so you can check the arithmetic by hand.")
+    print("    for _ in range(3)     THREE different draws. Wq=Wk=Wv would make every")
+    print(f"                          query its own key — here W_q == W_k is {np.array_equal(Wq, Wk)}.")
 step("the three weight matrices", s2)
 
 # ── 3 ────────────────────────────────────────────────────────────────────────
