@@ -108,8 +108,25 @@
 
   <div class="note">
     <p><b>“Project” just means multiply by a matrix.</b> <code>qⁱ = W<sup>q</sup>aⁱ</code> takes the
-    token's full representation — say 4096 numbers — and re-expresses it as 128 numbers in a new
-    space. Nothing is added; a particular 128-dimensional view is extracted from what was already there.</p>
+    token's full representation and re-expresses it in a smaller space. Nothing is added; a particular
+    view is extracted from what was already there. The shapes, with typical numbers:</p>
+
+<pre><code>aⁱ   d_model × 1      4096 × 1     the token, as it arrives
+W<sup>q</sup>   d_k × d_model    128 × 4096   learned, shared by every position
+qⁱ   d_k × 1          128 × 1     <b>= W<sup>q</sup>aⁱ</b>   (128×4096)(4096×1)</code></pre>
+
+    <p><code>W<sup>k</sup></code> has the same shape as <code>W<sup>q</sup></code>, so queries and keys
+    land in the same 128-dimensional space and can be compared. <code>W<sup>v</sup></code> is
+    <code>d_v × d_model</code>, and <code>d_v</code> need not equal <code>d_k</code> — the payload is
+    not compared against anything, so it is free to be a different size.</p>
+
+    <div class="warn">
+      <p><b>The notebook writes these transposed, and it is the same thing.</b> This page follows the
+      slides: tokens are <i>columns</i>, so <code>W<sup>q</sup></code> is <code>d_k × d_model</code> and
+      <code>q = W<sup>q</sup>a</code>. PyTorch — and <code>practice/p0_attention</code> — stack tokens as
+      <i>rows</i>, so the matrix is <code>d_model × d_k</code> and you write <code>Q = X @ W_q</code>.
+      Transpose one convention and you get the other. Check which a source uses before matching shapes.</p>
+    </div>
     <p>The same vector <code>aⁱ</code> goes through <b>both</b> matrices, giving two different views
     of the one token:</p>
     <ul class="plain">
