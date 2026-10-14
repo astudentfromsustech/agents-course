@@ -18,6 +18,7 @@
       </li>
       <li class="here"><a href="../01_transformer/01_self_attention.html"><i>01</i>Transformer</a>
         <ul class="toc-sec">
+          <li class="l3"><a href="#s-where-this-sits-in-the-model">Where this sits in the model</a></li>
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
           <li class="l3"><a href="#s-why-relevance-has-to-be-learned">Why relevance has to be learned</a></li>
           <li class="l3"><a href="#s-the-mechanism-score-weight-read">The mechanism: score, weight, read</a></li>
@@ -98,7 +99,77 @@
   each of those words — learned, directional, recomputed — is load-bearing.</p>
 </div>
 
-<h3 id="s-the-problem-attention-is-solving">The problem attention is solving</h3>
+<h3 id="s-where-this-sits-in-the-model">Where this sits in the model</h3>
+
+  <p>Before the mechanism, the map — because attention on its own predicts nothing. It is <b>one
+  sub-layer, inside a block, that repeats</b>:</p>
+
+  <figure>
+    <div class="svgbox">
+    <svg viewBox="0 0 680 250" width="680" role="img"
+         aria-label="The path through a transformer. Tokens are embedded and given positions, producing an n by d_model matrix. That enters a stack of N identical blocks. Inside each block the vector is updated twice: first x gets attention of normalised x added to it, which mixes information across positions; then x gets the MLP of normalised x added to it, which processes each position alone. The same n by d_model shape comes out of every block, which is why they stack. After the last block a final normalisation is applied, then the last position's vector is multiplied by the unembedding matrix to give logits over the vocabulary, from which the next token is sampled.">
+      <style>
+        .w1{stroke-width:1.3}
+        .wh{font-size:12.5px; font-weight:680; fill:var(--ink)}
+        .ws{font-size:11px; fill:var(--ink-2)}
+        .wm{font-family:var(--mono); font-size:10px; fill:var(--ink-3)}
+        .wl{stroke:var(--line-2); stroke-width:1.4; fill:none}
+      </style>
+      <defs><marker id="aw1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--line-2)"/></marker></defs>
+
+      <rect class="w1" x="14" y="86" width="104" height="48" rx="7" fill="var(--panel)" stroke="var(--line-2)"/>
+      <text x="26" y="106" class="ws">tokens →</text>
+      <text x="26" y="123" class="ws">embed + position</text>
+      <path class="wl" d="M120,110 L146,110" marker-end="url(#aw1)"/>
+      <text x="123" y="101" class="wm">n×d</text>
+
+      <rect class="w1" x="150" y="36" width="256" height="178" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="5 3"/>
+      <text x="164" y="57" class="wm" fill="var(--accent)">BLOCK, repeated N times (12 – 100+)</text>
+
+      <rect class="w1" x="166" y="68" width="224" height="52" rx="7" fill="var(--green-soft)" stroke="var(--green)"/>
+      <text x="178" y="88" class="wh">x += attention(norm(x))</text>
+      <text x="178" y="106" class="ws">mixes ACROSS positions ← this page</text>
+
+      <rect class="w1" x="166" y="134" width="224" height="52" rx="7" fill="var(--panel)" stroke="var(--line-2)"/>
+      <text x="178" y="154" class="wh">x += MLP(norm(x))</text>
+      <text x="178" y="172" class="ws">each position alone</text>
+
+      <path class="wl" d="M410,110 L440,110" marker-end="url(#aw1)"/>
+      <text x="410" y="101" class="wm">n×d</text>
+
+      <rect class="w1" x="444" y="86" width="100" height="48" rx="7" fill="var(--panel)" stroke="var(--line-2)"/>
+      <text x="456" y="106" class="ws">final norm</text>
+      <text x="456" y="123" class="ws">last position</text>
+      <path class="wl" d="M548,110 L574,110" marker-end="url(#aw1)"/>
+
+      <rect class="w1" x="578" y="86" width="90" height="48" rx="7" fill="var(--blue-soft)" stroke="var(--blue)"/>
+      <text x="590" y="106" class="ws">unembed →</text>
+      <text x="590" y="123" class="ws">next token</text>
+
+      <text x="150" y="236" class="wm">same n×d in, same n×d out — which is exactly why blocks stack</text>
+    </svg>
+    </div>
+    <figcaption>Attention never changes the shape. It only changes <i>what is in</i> each position's vector — by mixing in the other positions.</figcaption>
+  </figure>
+
+  <p>Three things follow, and they are what makes the rest of the page make sense:</p>
+
+  <ul class="plain">
+    <li><b>Attention's output is not a prediction.</b> It is an <i>edit</i> added to a running vector.
+    The prediction happens once, at the very end, from the last position's final vector.</li>
+    <li><b>Shape in = shape out.</b> <code>n × d_model</code> both ways. Attention mixes across
+    positions without changing the container — which is precisely why you can run 100 of them
+    in a row.</li>
+    <li><b>Each block does one of each.</b> Attention is the only step where a token can see another
+    token; the MLP then processes every position alone. <i>Mix, think, mix, think</i>, N times.</li>
+  </ul>
+
+  <p>So when the rest of this page says "the output <code>b¹</code>", that vector is not an answer —
+  it is what gets added to position 1's running total before the next block sees it. The full path,
+  tokenizer to sampled token, is <a href="02_transformer.html">part 2</a>.</p>
+
+  <h3 id="s-the-problem-attention-is-solving">The problem attention is solving</h3>
 
   <p>Before the mechanism, the goal. Given a sequence of vectors <code>a¹…aⁿ</code>, each output <code>b<sup>i</sup></code> must be built from <i>whichever other positions actually matter</i> for position <i>i</i> — and which ones matter differs for every token, every sentence, and every layer. It can't be fixed in advance, so it has to be computed from the content itself:</p>
 
