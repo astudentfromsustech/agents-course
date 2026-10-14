@@ -91,6 +91,12 @@ def s3(silent):
     print("    query  = what am I looking for?")
     print("    key    = what do I advertise?")
     print("    value  = what do I pass on if chosen?")
+    print("\n  @ is MATRIX MULTIPLICATION (np.matmul), not elementwise — that is *.")
+    print(f"    X @ W_q   {S['X'].shape} @ {S['Wq'].shape} -> {(S['X'] @ S['Wq']).shape}"
+          "   inner dims must agree")
+    print(f"    X * X     elementwise, {(S['X'] * S['X']).shape} — a different operation entirely")
+    print("\n  Row i of the result depends on row i of X and NOTHING else. No mixing")
+    print("  happens here; that is why the same three matrices serve every position.")
     show("Q", Q); show("K", K); show("V", V)
     hand = S["X"][1] @ S["Wq"]
     print(f"\n  CHECK: row 'cat' of Q is X[1] @ W_q")
