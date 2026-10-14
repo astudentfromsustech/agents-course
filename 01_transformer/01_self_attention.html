@@ -102,7 +102,82 @@
     </tbody>
   </table></div>
 
-  <p>Projecting through <code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> first turns the score into a learned bilinear form <code>aⁱᵀ M aʲ</code> with <code>M = (W<sup>q</sup>)ᵀW<sup>k</sup></code> — asymmetric, no privileged diagonal, and different in every head. <b>All four problems are fixed by the same move.</b></p>
+  <p>Projecting through <code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> first fixes all four with one move. Here is why that works, and why it is less of a leap than it looks.</p>
+
+  <h4>The dot product already has a hidden assumption</h4>
+
+  <p>Write the raw dot product as a matrix sandwich and the assumption becomes visible:</p>
+
+<pre><code>aⁱ · aʲ  =  aⁱᵀ <b>I</b> aʲ        <span class="cm"># the identity matrix was there all along</span></code></pre>
+
+  <p>So scoring with a bare dot product is <i>not</i> the assumption-free choice. It is the choice
+  <code>M = I</code>: <b>every dimension matters equally, and a feature may only ever match itself.</b>
+  Dimension 7 of one token can only be compared against dimension 7 of another. That single constraint
+  is where all four failures come from — <code>I</code> is symmetric, its diagonal dominates, and there
+  is only one of it.</p>
+
+  <p>The generalisation writes itself. Replace <code>I</code> with something learned:</p>
+
+<pre><code>score(aⁱ, aʲ)  =  aⁱᵀ <b>M</b> aʲ      <span class="cm"># M learned instead of assumed</span></code></pre>
+
+  <div class="note">
+    <p><b>What the off-diagonal entries buy, and it is the whole point.</b> <code>M[7,3] ≠ 0</code>
+    means <i>dimension 7 of the query token is compared against dimension 3 of the key token</i>.
+    Relevance stops meaning "these two are alike" and starts meaning <b>a learned correspondence
+    between two different features</b>.</p>
+    <p>That is what lets a verb find its subject. The verb does not look for a token resembling a verb;
+    it looks for "is a noun, nominative, singular" — a <i>different</i> feature from the one it carries.
+    With <code>M = I</code> that question cannot even be posed.</p>
+  </div>
+
+  <h4>Why factor M, instead of just learning it</h4>
+
+  <p>Now substitute the projections and the factorisation falls out in one line:</p>
+
+<pre><code>qⁱ = W<sup>q</sup>aⁱ ,  kʲ = W<sup>k</sup>aʲ
+
+qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</sup>)ᵀW<sup>k</sup> aʲ  =  aⁱᵀ <b>M</b> aʲ</code></pre>
+
+  <p>Query-and-key is not a different idea from the bilinear form — <b>it <i>is</i> the bilinear
+  form, written as two factors.</b> Three things make the factored version the one you want:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th></th><th>learn <code>M</code> directly</th><th>learn <code>W<sup>q</sup></code>, <code>W<sup>k</sup></code></th></tr></thead>
+    <tbody>
+      <tr><td><b>parameters</b> <span class="cm">d_model 4096, d_k 128</span></td><td>4096² ≈ <b>16.8 M</b> per head</td><td>2 × 4096×128 ≈ <b>1.0 M</b> — 16× fewer</td></tr>
+      <tr><td><b>rank</b></td><td>full — free to use all 4096 directions</td><td>at most <code>d_k</code> = 128. A built-in regulariser: the head must commit to a small subspace</td></tr>
+      <tr><td><b>cost of n² scores</b></td><td><code>aⁱᵀMaʲ</code> per pair, or re-factor it anyway</td><td>project once, then <b>one matmul</b> <code>QKᵀ</code> for every pair at once</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The last row is the practical one. <code>q</code> and <code>k</code> are reusable intermediates:
+  compute each token's query and key once, and every pairwise score is a single matrix multiply. Keep
+  <code>M</code> whole and you would factor it yourself to get that.</p>
+
+  <h4>How anyone came up with it</h4>
+
+  <p>It was not invented from nothing — it arrived by two small steps, each fixing the step before:</p>
+
+  <ol class="steps">
+    <li><b>Additive attention</b> (Bahdanau, 2014) scored a query–key pair by running both through a
+    small network: <code>score = vᵀ tanh(W₁h + W₂s)</code>. Learned and expressive, but it is an MLP
+    per pair — there is no way to batch <i>n²</i> of them into a matmul.</li>
+    <li><b>Multiplicative attention</b> (Luong, 2015) replaced that network with <code>hᵀWs</code> —
+    <b>the bilinear form, four years before the transformer</b>. Same expressiveness for the job,
+    one matmul instead of an MLP.</li>
+    <li>The transformer <b>factored</b> that <code>W</code> into <code>W<sup>q</sup></code> and
+    <code>W<sup>k</sup></code>, which bought the parameter and rank savings above, ran several in
+    parallel as heads, and pointed it at a sequence's own tokens instead of at a separate encoder.</li>
+  </ol>
+
+  <div class="note">
+    <p><b>If you have done metric learning, you have already done this.</b> The Mahalanobis distance
+    <code>(a−b)ᵀM(a−b)</code> is exactly the same move: Euclidean distance is the <code>M = I</code>
+    special case, and learning <code>M</code> lets the data say which directions matter and which
+    features correspond. Attention's score is the bilinear cousin, learned end to end for one
+    question — <i>which token should I read next?</i> — and factored so that all <i>n²</i> answers
+    come out of one matrix multiply.</p>
+  </div>
   </div>
 
   <h4>Scoring: project first, then dot</h4>
