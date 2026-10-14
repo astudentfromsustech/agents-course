@@ -226,6 +226,42 @@ def s10(silent):
     print("  a feed-forward block and a residual add, N times. Nothing else is new.")
 step("concatenate and project", s10)
 
+# ── 11 ───────────────────────────────────────────────────────────────────────
+def s11(silent):
+    if silent: return
+    X, Wq, Wk, Wv, mask = S["X"], S["Wq"], S["Wk"], S["Wv"], S["mask"]
+
+    def attend(Xin):
+        q, k, v = Xin @ Wq, Xin @ Wk, Xin @ Wv
+        sc = np.where(mask, q @ k.T / np.sqrt(d_model), -np.inf)
+        e = np.exp(sc - sc.max(-1, keepdims=True))
+        return (e / e.sum(-1, keepdims=True)) @ v
+
+    A_ctx, B_ctx = X.copy(), X.copy()
+    B_ctx[0] = B_ctx[2] = -X[0]          # same token 1, different neighbours
+    oa, ob = attend(A_ctx)[1], attend(B_ctx)[1]
+
+    print("\n  What you bought is CONTEXT. Before attention a token's vector is the")
+    print("  same wherever it appears. After, it carries its neighbourhood.")
+    print(f"\n    token 1's INPUT row identical in both contexts?  {np.allclose(A_ctx[1], B_ctx[1])}")
+    print(f"    token 1's OUTPUT row identical?                 {np.allclose(oa, ob)}")
+    print(f"      context A -> {np.round(oa, 2)}")
+    print(f"      context B -> {np.round(ob, 2)}")
+    print(f"      differing by {np.abs(oa - ob).max():.2f} at the largest coordinate")
+    print("\n  What you attach decides the task; attention does not change:")
+    print("    generate      last position -> linear -> vocab logits -> sample   (GPT)")
+    print("    classify      pool -> linear -> classes")
+    print("    tag tokens    each position -> linear -> label")
+    print("    retrieve      pool -> one vector, compared by cosine  (chapter 05)")
+    print("    enc -> dec    encoder outputs become the K and V a decoder attends to")
+    print("\n  None of it is text-specific: image patches, amino acids, genomic bins.")
+    print("  Attention needs a set of vectors and a reason to relate them.")
+    print("\n  And why stack N layers? One layer = one round of looking around.")
+    print("  Stacking lets information travel in HOPS. p1 shows it forming: a")
+    print("  previous-token head in layer 0 feeding an induction head in layer 1,")
+    print("  neither working alone. That composition is the reason for depth.")
+step("what the output is for", s11)
+
 print("\n" + "─" * 74)
 print("Next:  python3 attention_lab.py      — now write it yourself")
 print("       python3 walkthrough.py --step 7   — revisit any step\n")
