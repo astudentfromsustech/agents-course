@@ -19,8 +19,12 @@
       <li class="here"><a href="../01_transformer/01_self_attention.html"><i>01</i>Transformer</a>
         <ul class="toc-sec">
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
+          <li class="l3"><a href="#s-why-relevance-has-to-be-learned">Why relevance has to be learned</a></li>
+          <li class="l3"><a href="#s-the-mechanism-score-weight-read">The mechanism: score, weight, read</a></li>
+          <li class="l3"><a href="#s-why-three-projections-and-how-they-relate">Why three projections, and how they relate</a></li>
           <li class="l3"><a href="#s-the-batched-form-four-matmuls-and-a-softmax">The batched form: four matmuls and a softmax</a></li>
           <li class="l3"><a href="#s-multi-head-several-kinds-of-relevance-at-once">Multi-head: several kinds of relevance at once</a></li>
+          <li class="l3"><a href="#s-what-the-attention-scores-are">What the attention scores are</a></li>
           <li class="l3"><a href="#s-position-the-one-thing-attention-cannot-see">Position: the one thing attention cannot see</a></li>
           <li class="l3"><a href="#s-the-same-layer-other-modalities">The same layer, other modalities</a></li>
           <li class="l3"><a href="#s-self-attention-vs-cnn-the-same-operation-one-w">Self-attention vs CNN: the same operation, one with its receptive field frozen</a></li>
@@ -89,7 +93,7 @@
   </figure>
 
   <div class="note">
-    <h4>Why “relevant” can’t just mean “similar”</h4>
+    <h3 id="s-why-relevance-has-to-be-learned">Why relevance has to be learned</h3>
   <p>The obvious shortcut is to score that arrow with the raw dot product <code>aⁱ · aʲ</code>. It fails four times over, each one fatal on its own:</p>
 
   <div class="tw" style="margin:14px 0"><table>
@@ -98,7 +102,7 @@
       <tr><td><b>symmetric</b></td><td>a pronoun could never attend to its antecedent more than the reverse — but relevance is directional</td></tr>
       <tr><td><b>diagonal-dominated</b><br><span class="cm">aⁱ·aⁱ = |aⁱ|² is the largest entry in its row</span></td><td>every token attends almost entirely to itself; the layer collapses to the identity map</td></tr>
       <tr><td><b>the same everywhere</b><br><span class="cm">there is only one identity matrix</span></td><td>every head and every layer computes the same pattern — multi-head specialization becomes impossible</td></tr>
-      <tr><td><b>measuring the wrong thing</b></td><td>“relevant” usually isn't “similar”: a verb wants its subject, a closing bracket wants its opener</td></tr>
+      <tr><td><b>measuring the wrong thing</b></td><td>“relevant” usually isn't “similar”: a closing bracket wants its opener, not another bracket</td></tr>
     </tbody>
   </table></div>
 
@@ -147,9 +151,8 @@ qⁱ   d_k × 1          128 × 1     <b>= W<sup>q</sup>aⁱ</b>   (128×4096)(4
 
   <p>So scoring with a bare dot product is <i>not</i> the assumption-free choice. It is the choice
   <code>M = I</code>: <b>every dimension matters equally, and a feature may only ever match itself.</b>
-  Dimension 7 of one token can only be compared against dimension 7 of another. That single constraint
-  is where all four failures come from — <code>I</code> is symmetric, its diagonal dominates, and there
-  is only one of it.</p>
+  Dimension 7 of one token can only be compared against dimension 7 of another. <b>Every one of the four failures above is that one constraint, seen from a different
+  side.</b></p>
 
   <p>The generalisation writes itself. Replace <code>I</code> with something learned:</p>
 
@@ -215,7 +218,7 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
   </div>
   </div>
 
-  <h4>Scoring: project first, then dot</h4>
+  <h3 id="s-the-mechanism-score-weight-read">The mechanism: score, weight, read</h3>
   <p>So the arrow gets answered like this:</p>
 
   <figure>
@@ -288,7 +291,7 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
     <figcaption><b>The mechanism, complete.</b> Each position also emits a <b>value</b> <code>v<sup>i</sup> = W<sup>v</sup>a<sup>i</sup></code>, and the output is the weighted sum <code>b¹ = Σᵢ α′₁,ᵢ v<sup>i</sup></code>. Because the weights are non-negative and sum to 1, <code>b¹</code> is a <b>convex combination</b> of the value vectors — a soft read from a differentiable memory. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
 
-  <h4>Why three, and not one or two</h4>
+  <h3 id="s-why-three-projections-and-how-they-relate">Why three projections, and how they relate</h3>
 
   <p>The reason is not that three is a nice number. <b>Each token plays three different roles in a
   single attention step, and the roles need different information out of the same vector.</b></p>
@@ -328,7 +331,7 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
   decoupling of address from payload is what makes attention a <b>memory</b> rather than a
   similarity filter.</p>
 
-  <h4>How the three relate to each other</h4>
+  <h4>…and how they relate</h4>
 
   <p>They are not three independent knobs. <b>They pair up — and the pairs, not the matrices, are
   what the model actually learns.</b></p>
@@ -493,7 +496,7 @@ two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
     <p><b>Heads split the width, they don't add to it.</b> The intuitive worry is that 32 heads cost 32× — they don't. With <code>d_model = 4096</code> and 32 heads, each head works in <code>d_k = 128</code>, and <code>32 × 128 = 4096</code>: the same total dimension, <b>partitioned</b> rather than duplicated. Parameters and FLOPs are essentially unchanged from one wide head. What you get for free is <b>independence</b> — 32 separate score matrices that can specialize, instead of one that must compromise. That is close to the best trade in the architecture, and it's why every model uses many heads.</p>
   </div>
 
-  <h4>What role the scores play inside the transformer</h4>
+  <h3 id="s-what-the-attention-scores-are">What the attention scores are</h3>
 
   <p>Inside the forward pass the attention matrix has exactly one job, and naming it precisely is
   worth more than any analogy: <b><code>A</code> holds the connection weights of the only path by

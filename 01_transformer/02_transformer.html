@@ -536,7 +536,7 @@
     </li>
     <li>
       <span class="st">Residual + normalization</span>
-      <span class="sd">Each sublayer computes <code>x = x + f(norm(x))</code>. The addition is what makes 100-layer depth trainable; RMSNorm keeps activations from exploding. Boring, load-bearing.</span>
+      <span class="sd">Each sublayer computes <code>x = x + f(norm(x))</code> — it <b>adds to</b> a running total rather than replacing it. That running total is the <b>residual stream</b>, and it is the thing the whole architecture is organised around. The norm keeps the stream's scale stable as layers keep adding to it. Expanded below.</span>
     </li>
     <li>
       <span class="st">Unembed → logits → sample</span>
@@ -547,6 +547,81 @@
       <span class="sd">Because of the causal mask, past tokens' keys and values never change. Cache them and each new token costs one forward pass instead of <i>n</i>. Every serving cost, context limit and "time to first token" number you'll ever read traces back to this cache.</span>
     </li>
   </ol>
+
+  <h4>Residual and normalization, the two boring load-bearing parts</h4>
+
+  <p>Everything above describes what each sublayer <i>computes</i>. This is about how the sublayers are
+  <i>wired together</i> — and the wiring turns out to matter as much as the parts.</p>
+
+  <p>The whole of it is one line, read carefully:</p>
+
+<pre><code>x = x + f(norm(x))
+    │   └── the sublayer: attention, or the MLP
+    └────── the running total it is added to</code></pre>
+
+  <h4>The residual stream: layers add, they do not transform</h4>
+
+  <p>The naive picture of a deep network is a pipeline — layer 2 transforms layer 1's output, layer 3
+  transforms layer 2's. <b>A transformer does not work that way.</b> There is one vector per position
+  that runs the full depth of the model, and every sublayer <i>reads</i> it, computes something, and
+  <i>adds the result back</i>. Nothing is ever overwritten.</p>
+
+  <div class="note">
+    <p><b>Three consequences, and they are not small.</b></p>
+    <ul class="plain">
+      <li><b>Gradients reach the bottom.</b> Because <code>x</code> appears on the right-hand side,
+      the derivative of the output with respect to the input contains a <code>+1</code> term that no
+      sublayer can shrink. There is an unbroken path from the loss to layer 1. Without it, past a few
+      dozen layers the signal dies and the model simply does not train — residuals are the single
+      reason depth became possible, in transformers and ResNets alike.</li>
+      <li><b>Every layer writes into the same space.</b> Layer 3's output and layer 40's output are
+      vectors of the same shape in the same coordinates. That is why you can project an intermediate
+      layer through the unembedding and read plausible tokens out of it — the "logit lens" — and why
+      ablating a single layer often degrades a model rather than breaking it.</li>
+      <li><b>The model is a sum of contributions, not a composition of functions.</b> You can write the
+      final state as <code>x₀ + Σ(what each sublayer added)</code>. That turns "what did layer 12's
+      head 3 do?" into a question with an actual answer, which is the foundation every mechanistic
+      interpretability result stands on — including <code>p1</code>'s two-layer induction circuit.</li>
+    </ul>
+  </div>
+
+  <h4>Normalization: why it is there, and which one</h4>
+
+  <p>If every sublayer keeps <i>adding</i> to the stream, its magnitude grows with depth, and the
+  softmaxes and nonlinearities downstream get fed ever-larger numbers. Normalization rescales it
+  back to a predictable range.</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th></th><th>what it does</th><th>note</th></tr></thead>
+    <tbody>
+      <tr><td><b>LayerNorm</b></td><td>per token, subtract the mean and divide by the standard deviation <i>across the feature dimension</i>, then apply a learned gain and bias</td><td>the original choice</td></tr>
+      <tr><td><b>RMSNorm</b></td><td>same, minus the mean-centring and the bias — just divide by the root-mean-square and scale</td><td>what most current models use. Cheaper, and the centring turned out not to be doing much</td></tr>
+      <tr><td><b>BatchNorm</b></td><td>normalizes across the <i>batch</i></td><td>🔴 <b>wrong tool here.</b> It makes a token's representation depend on the other sequences in the batch, which breaks at batch size 1 and is incoherent for autoregressive generation</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The distinction that matters: <b>LayerNorm and RMSNorm normalize each token on its own</b>, using
+  only that token's own features. No cross-token, no cross-batch dependency — so the same code works
+  for one token or a hundred thousand, training or inference.</p>
+
+  <h4>Pre-norm or post-norm, and why everyone switched</h4>
+
+  <p>Where the norm sits relative to the addition looks like a detail. It decides whether a deep model
+  trains at all:</p>
+
+<pre><code>post-norm   x = norm(x + f(x))     <span class="cm"># original 2017 paper</span>
+pre-norm    x = x + f(norm(x))     <span class="cm"># essentially everything since</span></code></pre>
+
+  <p>In <b>post</b>-norm the residual path passes <i>through</i> a normalization every layer, so the
+  clean identity path is repeatedly rescaled and the gradient guarantee weakens with depth — deep
+  post-norm transformers need learning-rate warmup and careful initialisation, and still go unstable.
+  In <b>pre</b>-norm the stream itself is never touched: the norm applies only to the <i>copy</i> that
+  the sublayer reads. The identity path runs from input to output unbroken, which is what makes
+  100-plus layers routine.</p>
+
+  <p>The price is that the stream's magnitude really does grow with depth, so a pre-norm model needs
+  one <b>final</b> normalization after the last block, before the unembedding. If you ever wondered why
+  model code has a lone <code>ln_f</code> hanging off the end of the stack — that is what it is for.</p>
 
   <h4>The same thing unrolled, with the causal mask</h4>
 <pre><code>Q = x @ W_q          <span class="cm"># [n, d]  what each token is looking for</span>
