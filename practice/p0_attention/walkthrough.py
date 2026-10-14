@@ -98,6 +98,21 @@ def s3(silent):
     print("\n  Row i of the result depends on row i of X and NOTHING else. No mixing")
     print("  happens here; that is why the same three matrices serve every position.")
     show("Q", Q); show("K", K); show("V", V)
+    X, Wq, Wk = S["X"], S["Wq"], S["Wk"]
+    sym = lambda M: np.allclose(M, M.T)
+    print("\n  WHY THREE PROJECTIONS, and not just X?")
+    print("    Score X against itself and relevance is fixed — embedding similarity,")
+    print("    forever. The projections make relevance LEARNABLE.")
+    print("    And W_q must differ from W_k, or the scores come out SYMMETRIC:")
+    print(f"      no projection   X @ X.T           symmetric? {sym(X @ X.T)}")
+    print(f"      tied W_q=W_k    (XWq)(XWq).T      symmetric? {sym((X@Wq) @ (X@Wq).T)}")
+    print(f"      separate        (XWq)(XWk).T      symmetric? {sym((X@Wq) @ (X@Wk).T)}")
+    St, Sr = (X@Wq) @ (X@Wq).T, (X@Wq) @ (X@Wk).T
+    print(f"      tied:     cat->The {St[1,0]:6.2f}  The->cat {St[0,1]:6.2f}   forced equal")
+    print(f"      separate: cat->The {Sr[1,0]:6.2f}  The->cat {Sr[0,1]:6.2f}   free to differ")
+    print("    Relevance is directional — an adjective seeks its noun, not the reverse.")
+    print("    V is separate again: the key is an address, the value is the payload.")
+
     hand = S["X"][1] @ S["Wq"]
     print(f"\n  CHECK: row 'cat' of Q is X[1] @ W_q")
     print(f"         by hand → {np.round(hand,2)}")
