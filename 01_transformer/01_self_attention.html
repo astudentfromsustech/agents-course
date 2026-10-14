@@ -19,6 +19,7 @@
       <li class="here"><a href="../01_transformer/01_self_attention.html"><i>01</i>Transformer</a>
         <ul class="toc-sec">
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
+          <li class="l3"><a href="#s-the-batched-form-four-matmuls-and-a-softmax">The batched form: four matmuls and a softmax</a></li>
           <li class="l3"><a href="#s-multi-head-several-kinds-of-relevance-at-once">Multi-head: several kinds of relevance at once</a></li>
           <li class="l3"><a href="#s-position-the-one-thing-attention-cannot-see">Position: the one thing attention cannot see</a></li>
           <li class="l3"><a href="#s-the-same-layer-other-modalities">The same layer, other modalities</a></li>
@@ -88,10 +89,24 @@
   </figure>
 
   <div class="note">
-    <p><b>Why “relevant?” can't just mean “similar”.</b> The obvious shortcut — score that arrow with the raw dot product <code>aⁱ · aʲ</code> — fails for four reasons, each fatal on its own. It is <b>symmetric</b>, so a pronoun could never attend to its antecedent more than the reverse, and relevance in language is directional. Its <b>diagonal dominates</b> (<code>aⁱ·aⁱ = |aⁱ|²</code> is necessarily the largest entry in its row), so every token would attend almost entirely to itself and the layer would collapse to the identity map. There is only <b>one</b> identity matrix, so every head and every layer would compute the same pattern — multi-head specialization becomes impossible. And “relevant” usually isn't “similar” at all: a verb wants its subject, a closing bracket wants its opener. Projecting through <code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> first turns the score into a learned bilinear form <code>aⁱᵀ M aʲ</code> with <code>M = (W<sup>q</sup>)ᵀW<sup>k</sup></code> — asymmetric, no privileged diagonal, and different in every head.</p>
+    <h4>Why “relevant” can’t just mean “similar”</h4>
+  <p>The obvious shortcut is to score that arrow with the raw dot product <code>aⁱ · aʲ</code>. It fails four times over, each one fatal on its own:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>Raw <code>aⁱ · aʲ</code> is…</th><th>so…</th></tr></thead>
+    <tbody>
+      <tr><td><b>symmetric</b></td><td>a pronoun could never attend to its antecedent more than the reverse — but relevance is directional</td></tr>
+      <tr><td><b>diagonal-dominated</b><br><span class="cm">aⁱ·aⁱ = |aⁱ|² is the largest entry in its row</span></td><td>every token attends almost entirely to itself; the layer collapses to the identity map</td></tr>
+      <tr><td><b>the same everywhere</b><br><span class="cm">there is only one identity matrix</span></td><td>every head and every layer computes the same pattern — multi-head specialization becomes impossible</td></tr>
+      <tr><td><b>measuring the wrong thing</b></td><td>“relevant” usually isn't “similar”: a verb wants its subject, a closing bracket wants its opener</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Projecting through <code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> first turns the score into a learned bilinear form <code>aⁱᵀ M aʲ</code> with <code>M = (W<sup>q</sup>)ᵀW<sup>k</sup></code> — asymmetric, no privileged diagonal, and different in every head. <b>All four problems are fixed by the same move.</b></p>
   </div>
 
-  <p>So the arrow gets answered like this — <b>project first, then dot</b>:</p>
+  <h4>Scoring: project first, then dot</h4>
+  <p>So the arrow gets answered like this:</p>
 
   <figure>
     <div class="slide portrait">
@@ -101,8 +116,13 @@
     <figcaption><b>The scoring module.</b> Note where the parameters are: <code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> hold every learnable weight in this picture, and the dot product at the top has <b>none</b>. It is fixed, parameter-free glue — the two projections decide what “relevant” means, and the dot product merely evaluates it. That division is the reason attention works: substituting the projections back in gives <code>α = aⁱᵀ M aʲ</code>, a fully general <b>learned bilinear form</b>, not a similarity between raw embeddings. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
 
-  <p>Two details this picture leaves out, both load-bearing. The projections are <b>narrowing</b>: <code>W<sup>q</sup>, W<sup>k</sup></code> map <code>d_model</code> (≈4096) down to <code>d_k</code> (≈128), so each head compares only the slice of the representation it cares about — and scoring all pairs gets ~32× cheaper in the process. And the score is <b>scaled</b>: real implementations use <code>α = q·k/√d_k</code>, because the variance of a dot product grows with <code>d_k</code>, and unscaled scores of ±11 would saturate the softmax into a near one-hot distribution where the gradient vanishes.</p>
+  <p>Two details the picture leaves out, both load-bearing:</p>
+  <ul class="plain">
+    <li><b>The projections narrow.</b> <code>W<sup>q</sup>, W<sup>k</sup></code> map <code>d_model</code> (≈4096) down to <code>d_k</code> (≈128), so each head compares only the slice it cares about — and scoring all pairs gets ~32× cheaper.</li>
+    <li><b>The score is scaled:</b> <code>α = q·k/√d_k</code>. The variance of a dot product grows with <code>d_k</code>, and unscaled scores of ±11 saturate the softmax into a near one-hot distribution where the gradient vanishes.</li>
+  </ul>
 
+  <h4>Weights: softmax over the scores</h4>
   <p>Now run that module once per position and normalize the results — one query against every key:</p>
 
   <figure>
@@ -113,8 +133,14 @@
     <figcaption><b>One row of the attention matrix.</b> The query from position 1 is dotted against <i>every</i> key — including its own <code>k¹</code>, since a token is allowed to attend to itself — producing four raw scores. Softmax turns that row into a <b>probability distribution over positions</b>. Do this for all <i>n</i> queries and you have the full <code>n × n</code> matrix, computed as the single matmul <code>QKᵀ</code>. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
 
-  <p>Softmax is doing three jobs here, and it's worth separating them. It <b>normalizes</b>, so the weights sum to 1 and the output is a weighted <i>average</i> of values — bounded no matter how long the sequence gets. It <b>sharpens</b>, because exponentiating turns a modest score gap into a large weight gap, letting attention approximate a hard lookup while staying differentiable. And it <b>never assigns exactly zero</b>, which is what keeps the whole thing trainable: every position retains some gradient, so a position the model currently ignores can still learn to become relevant. A hard <code>argmax</code> would give you the lookup but kill the gradient.</p>
+  <p>Softmax is doing three separate jobs here:</p>
+  <ul class="plain">
+    <li><b>Normalizes</b> — weights sum to 1, so the output is a weighted <i>average</i> of values, bounded however long the sequence gets.</li>
+    <li><b>Sharpens</b> — exponentiating turns a modest score gap into a large weight gap, approximating a hard lookup while staying differentiable.</li>
+    <li><b>Never assigns exactly zero</b> — every position keeps some gradient, so one the model currently ignores can still learn to become relevant. A hard <code>argmax</code> would give the lookup and kill the gradient.</li>
+  </ul>
 
+  <h4>The payload: a third projection</h4>
   <p>Those weights are still only an <i>addressing scheme</i> — they say where to read, not what is read. A third projection supplies the payload:</p>
 
   <figure>
@@ -127,7 +153,8 @@
 
   <p>The reason <code>V</code> is a <i>separate</i> projection from <code>K</code> is easy to miss and genuinely important. <b><code>K</code> answers "should you read me?" while <code>V</code> answers "here is what you get."</b> Tie them together and a token's findability would be forced to equal its content. Keeping them separate lets a token be <i>indexed</i> by one property and <i>contribute</i> another — findable by its grammatical role, say, while handing over its semantic content. That decoupling of address from payload is what makes attention a memory rather than a similarity filter.</p>
 
-  <p>Everything drawn so far computes <code>b¹</code> only. Position 2 takes the identical route — its own query against the same four keys, the same weights, a different row:</p>
+  <h4>Every position takes the same route</h4>
+  <p>Everything drawn so far computes <code>b¹</code> only. Position 2 uses its own query against the same four keys and the same weights — a different row:</p>
 
   <figure>
     <div class="slide">
@@ -147,7 +174,8 @@
     <figcaption><b>The property that made scale possible.</b> Each <code>b<sup>i</sup></code> depends on the <i>inputs</i>, never on another <code>b</code> — so the whole layer is one matmul, not <i>n</i> sequential steps. An RNN cannot have this: its state at step <i>i</i> requires step <i>i−1</i>, so training time grows with sequence length no matter how many GPUs you own. That single dependency is what attention removed, and it is the reason this architecture could absorb the entire compute budget of a cluster. Note also the caption on the slide — the inputs <b>can be either the model input or a hidden layer</b>, which is what lets these blocks stack. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
 
-  <p>That independence is what licenses the batched form — and the batched form is where the whole operation collapses to one line. Two steps get you there. First the projections: because every position runs the same <code>W<sup>q</sup></code> against its own input, computing <code>q<sup>i</sup> = W<sup>q</sup>a<sup>i</sup></code> position by position is the same arithmetic as one matmul against the whole sequence:</p>
+  <h3 id="s-the-batched-form-four-matmuls-and-a-softmax">The batched form: four matmuls and a softmax</h3>
+  <p>That independence is what licenses it — and it is where the whole operation collapses to one line. Three steps get you there. First the projections: because every position runs the same <code>W<sup>q</sup></code> against its own input, computing <code>q<sup>i</sup> = W<sup>q</sup>a<sup>i</sup></code> position by position is the same arithmetic as one matmul against the whole sequence:</p>
 
   <figure>
     <div class="slide">
@@ -200,6 +228,7 @@
     <p><b>Don't let the transposes confuse you — they're the same equation.</b> The slides write <code>A = K<sup>ᵀ</sup>Q</code> and <code>O = V A′</code>; the paper and every framework write <code>softmax(QK<sup>ᵀ</sup>)V</code>. The difference is purely bookkeeping: the slides stack each vector as a <b>column</b> of the matrix, while PyTorch stacks each token as a <b>row</b> (shape <code>[batch, seq, dim]</code>, because that's how sequences arrive). Transpose one convention and you get the other — <code>O<sup>ᵀ</sup> = A′<sup>ᵀ</sup>V<sup>ᵀ</sup></code>. Worth noticing which convention a source uses before trying to match its shapes, since it also flips whether softmax runs over rows or columns.</p>
   </div>
 
+  <h4>Parallel to train, sequential to generate</h4>
   <p>The catch is that parallelism is a <i>training</i> property. At inference an LLM still emits one token at a time, each conditioned on the last — so generation is sequential even though the forward pass is not. That asymmetry is why training scales with hardware and decoding does not, and it is the root of the KV-cache and every batching trick in serving.</p>
 
   <h3 id="s-multi-head-several-kinds-of-relevance-at-once">Multi-head: several kinds of relevance at once</h3>
