@@ -451,7 +451,25 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
 
   <h3 id="s-multi-head-several-kinds-of-relevance-at-once">Multi-head: several kinds of relevance at once</h3>
 
-  <p>Everything so far builds <b>one</b> notion of relevance — one <code>M = (W<sup>q</sup>)ᵀW<sup>k</sup></code>, one attention pattern. But a token usually needs several relations at the same time: its syntactic head, the last mention of its referent, the topic of the paragraph. A single matrix has to average those into one compromise. So run several in parallel instead:</p>
+  <p>Everything so far builds <b>one</b> notion of relevance — one <code>M = (W<sup>q</sup>)ᵀW<sup>k</sup></code>, one attention pattern. But a token usually needs several relations at the same time: its syntactic head, the last mention of its referent, the topic of the paragraph.</p>
+
+  <div class="note">
+    <p><b>Why one head cannot just do all three — the softmax is the bottleneck.</b> Its weights sum
+    to 1, so a head has a <i>fixed budget of attention to spend</i>. Needing both the subject and the
+    antecedent, one head can only split it:</p>
+<pre><code>one head    α′ = [ .5 subject , .5 antecedent ]
+            b  = 0.5·v<sub>subject</sub> + 0.5·v<sub>antecedent</sub>     <span class="cm"># one blended vector</span>
+
+two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
+            head 2  α′ = [ 1.0 antecedent ] → b² = v<sub>antecedent</sub>   <span class="cm"># kept apart</span></code></pre>
+    <p>The damage is not just the halved weights — it is that <code>b</code> is a <b>blend nothing
+    downstream can un-mix</b>. Two heads each spend a full budget, and their results land in
+    <i>different slices</i> of the output, so <code>W<sup>O</sup></code> can route them separately.
+    <b>Multi-head is not extra capacity so much as several independent budgets with separable
+    outputs.</b></p>
+  </div>
+
+  <p>So run several in parallel instead:</p>
 
   <figure>
     <div class="slide">
@@ -473,6 +491,36 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
 
   <div class="note">
     <p><b>Heads split the width, they don't add to it.</b> The intuitive worry is that 32 heads cost 32× — they don't. With <code>d_model = 4096</code> and 32 heads, each head works in <code>d_k = 128</code>, and <code>32 × 128 = 4096</code>: the same total dimension, <b>partitioned</b> rather than duplicated. Parameters and FLOPs are essentially unchanged from one wide head. What you get for free is <b>independence</b> — 32 separate score matrices that can specialize, instead of one that must compromise. That is close to the best trade in the architecture, and it's why every model uses many heads.</p>
+  </div>
+
+  <h4>What the attention weights are good for, besides the output</h4>
+
+  <p>Inside the model they have exactly one job: weight the values. But the matrix <code>A</code> is
+  also the most legible thing a transformer produces, and it gets used four ways:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>use</th><th>what it means</th></tr></thead>
+    <tbody>
+      <tr><td><b>diagnostics</b></td><td>Score a head <i>by its pattern</i> to find out what it does. <code>p1</code> in <code>practice/</code> identifies induction heads exactly this way — and pairs every score with a control, which is what makes it evidence rather than a picture.</td></tr>
+      <tr><td><b>alignment</b></td><td>The original use: in translation, the attention map between source and target <i>is</i> a soft word alignment, read straight off the matrix.</td></tr>
+      <tr><td><b>copying / pointing</b></td><td>Use the distribution <b>directly as an output</b> over input positions, to copy a token rather than generate one — pointer networks and copy mechanisms. Here the weights are not an intermediate at all; they are the answer.</td></tr>
+      <tr><td><b>efficiency</b></td><td>Observed sparsity motivates sparse, local and sliding-window attention, and informs what a KV cache must keep.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="warn">
+    <p><b>🔴 Attention weights are not explanations, and this is a real argument, not a caveat for
+    politeness.</b> <a target="_blank" rel="noopener noreferrer" href="https://arxiv.org/abs/1902.10186"><i>Attention is not Explanation</i></a>
+    (Jain &amp; Wallace, 2019) showed that you can often find a <i>very different</i> attention
+    distribution that yields the same prediction — so the weights you observed were not the ones
+    responsible. <a target="_blank" rel="noopener noreferrer" href="https://arxiv.org/abs/1908.04626"><i>Attention is not not Explanation</i></a>
+    (Wiegreffe &amp; Pinter, 2019) pushed back on how that was tested. The defensible reading:
+    <b>attention shows where information <i>could</i> have flowed, not that it did, nor that it
+    mattered.</b></p>
+    <p>And do not assume every head earns its place —
+    <a target="_blank" rel="noopener noreferrer" href="https://arxiv.org/abs/1905.10650"><i>Are Sixteen Heads Really Better than One?</i></a>
+    (Michel et al., 2019) found a large share can be pruned at test time with little loss. Specialized
+    heads are real; <i>every</i> head being specialized is not.</p>
   </div>
 
   <h3 id="s-position-the-one-thing-attention-cannot-see">Position: the one thing attention cannot see</h3>
