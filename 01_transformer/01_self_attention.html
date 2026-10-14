@@ -261,7 +261,88 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
     <figcaption><b>The mechanism, complete.</b> Each position also emits a <b>value</b> <code>v<sup>i</sup> = W<sup>v</sup>a<sup>i</sup></code>, and the output is the weighted sum <code>b¹ = Σᵢ α′₁,ᵢ v<sup>i</sup></code>. Because the weights are non-negative and sum to 1, <code>b¹</code> is a <b>convex combination</b> of the value vectors — a soft read from a differentiable memory. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
 
-  <p>The reason <code>V</code> is a <i>separate</i> projection from <code>K</code> is easy to miss and genuinely important. <b><code>K</code> answers "should you read me?" while <code>V</code> answers "here is what you get."</b> Tie them together and a token's findability would be forced to equal its content. Keeping them separate lets a token be <i>indexed</i> by one property and <i>contribute</i> another — findable by its grammatical role, say, while handing over its semantic content. That decoupling of address from payload is what makes attention a memory rather than a similarity filter.</p>
+  <h4>Why three, and not one or two</h4>
+
+  <p>The reason is not that three is a nice number. <b>Each token plays three different roles in a
+  single attention step, and the roles need different information out of the same vector.</b></p>
+
+  <p>Take the token <code>sat</code> in <i>“The cat sat down”</i>. Within one layer it is used three
+  separate times, with three different partners:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>role</th><th>when</th><th>what it needs to say</th><th>vector</th></tr></thead>
+    <tbody>
+      <tr><td><b>the asker</b></td><td>computing <code>sat</code>'s own output</td><td>“I am a verb — I need my subject”</td><td><code>q = W<sup>q</sup>a</code></td></tr>
+      <tr><td><b>a candidate</b></td><td>every <i>other</i> token is deciding what to read</td><td>“I am a past-tense verb” — so others can judge whether to pick me</td><td><code>k = W<sup>k</sup>a</code></td></tr>
+      <tr><td><b>a source</b></td><td>once something has picked it</td><td>the actual content to hand over</td><td><code>v = W<sup>v</sup>a</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <p><b>It is a dictionary where every token is simultaneously a lookup and an entry.</b> In ordinary
+  Python <code>d["apple"] → "a red fruit"</code>: the <i>key</i> is what you match against, the
+  <i>value</i> is what you get back, and the <i>query</i> is what the caller brings. An entry needs
+  two things; a lookup needs a third. Attention asks every token to be both at once — so it needs
+  all three.</p>
+
+  <p>Now collapse them and watch each failure:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>if you tie…</th><th>what breaks</th></tr></thead>
+    <tbody>
+      <tr><td><b>query = key</b></td><td>“what I am looking for” becomes “what I advertise”. A verb hunting for a noun would advertise itself as <i>hunting for a noun</i> — so other verbs hunting for nouns would match it. The question silently turns from <i>who answers me?</i> into <i>who is like me?</i>, which is the symmetric failure from the table above.</td></tr>
+      <tr><td><b>key = value</b></td><td>“how I am found” becomes “what I give”. Look a token up by its grammatical role and you receive… its grammatical role. You want to find something by one property and be handed a <i>different</i> one — that is the whole point of a lookup.</td></tr>
+      <tr><td><b>all three</b></td><td>attention degenerates into a similarity filter over the raw embeddings: everything attends to whatever resembles it, and nothing is learned.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>So: <code>K</code> answers <b>“should you read me?”</b> and <code>V</code> answers <b>“here is
+  what you get.”</b> Keeping them apart lets a token be <i>indexed</i> by one property and
+  <i>contribute</i> another — findable by its grammatical role while handing over its meaning. That
+  decoupling of address from payload is what makes attention a <b>memory</b> rather than a
+  similarity filter.</p>
+
+  <h4>How the three relate to each other</h4>
+
+  <p>They are not three independent knobs. <b>They pair up — and the pairs, not the matrices, are
+  what the model actually learns.</b></p>
+
+  <p><code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> never appear on their own. They only
+  ever reach the loss through their product:</p>
+
+<pre><code>score  =  aⁱᵀ (W<sup>q</sup>)ᵀW<sup>k</sup> aʲ        <span class="cm"># only the product is identified</span></code></pre>
+
+  <p>Which means the split between them is <b>arbitrary</b>. Rotate the query space by any rotation
+  <code>R</code> and the key space by the same <code>R</code>, and every score is unchanged — the
+  rotations cancel inside the dot product. There are infinitely many <code>(W<sup>q</sup>,
+  W<sup>k</sup>)</code> pairs giving an identical model.</p>
+
+  <div class="warn">
+    <p><b>So do not try to interpret a single dimension of <code>q</code> or <code>k</code>.</b> It has
+    no meaning on its own — only the <i>angles between</i> queries and keys do. Two training runs will
+    produce completely different <code>W<sup>q</sup></code> matrices and the same attention patterns.</p>
+  </div>
+
+  <p><code>W<sup>v</sup></code> is in a different business entirely, and it pairs with a fourth matrix:
+  <code>W<sup>o</sup></code>, the projection that merges the heads back together at the end of the
+  layer. So the four matrices make <b>two circuits</b>, each answering one question:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>circuit</th><th>product</th><th>decides</th></tr></thead>
+    <tbody>
+      <tr><td><b>QK</b></td><td><code>(W<sup>q</sup>)ᵀW<sup>k</sup></code></td><td><b>where</b> to read from — it only ever produces attention weights, and never touches the content that gets moved</td></tr>
+      <tr><td><b>OV</b></td><td><code>W<sup>o</sup>W<sup>v</sup></code></td><td><b>what</b> gets written once a position has been selected — it never influences where the attention goes</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>That separation is why the <code>d</code>s differ. <code>W<sup>q</sup></code> and
+  <code>W<sup>k</sup></code> <i>must</i> share an output width <code>d_k</code>, or their dot product
+  would not typecheck. <code>W<sup>v</sup></code> is under no such constraint — <code>d_v</code> only
+  has to match what <code>W<sup>o</sup></code> expects, because a value is never compared with
+  anything, only summed.</p>
+
+  <p>It is also the cleanest way to read a trained head: <b>the QK circuit is the head's question, the
+  OV circuit is its answer.</b> <code>p1</code> in <code>practice/</code> separates exactly these — a
+  previous-token head and an induction head differ entirely in their QK circuits.</p>
 
   <h4>Every position takes the same route</h4>
   <p>Everything drawn so far computes <code>b¹</code> only. Position 2 uses its own query against the same four keys and the same weights — a different row:</p>
