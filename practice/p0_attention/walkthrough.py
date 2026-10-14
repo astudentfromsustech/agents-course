@@ -170,6 +170,24 @@ def s7(silent):
     print(f"\n  row sums → {A.sum(1)}   all 1.0: {np.allclose(A.sum(1), 1)}")
     print("\n  Read row 'sat': those three numbers are how much 'sat' draws from")
     print(f"  The/cat/sat → {np.round(A[2][:3],2)}. That row IS 'which words are relevant'.")
+
+    sm = lambda s: (np.exp(s - s.max(-1, keepdims=True))
+                    / np.exp(s - s.max(-1, keepdims=True)).sum(-1, keepdims=True))
+    sc = S["scaled"]
+    print("\n  exp() makes every value positive and turns differences into RATIOS:")
+    print("    a score 1 higher earns e≈2.72x the weight, 2 higher earns 7.4x.")
+    print("    That is what makes it a SOFT argmax rather than an average.")
+    print(f"\n    row sums    {A.sum(1)}   each query spends a budget of 1")
+    print(f"    column sums {np.round(A.sum(0),2)}   NOT 1 — nothing normalises a column")
+    print(f"\n    softmax(s) == softmax(s+100)?  {np.allclose(sm(sc), sm(sc+100))}   shift-invariant,")
+    print("      which is why subtracting the row max is free — and necessary, since")
+    print("      exp(1000) overflows to inf and inf/inf is nan.")
+    print("    But NOT scale-invariant — this is the √d_k story from step 5:")
+    for f in (0.25, 1, 4):
+        tag = "flatter" if f < 1 else ("as computed" if f == 1 else "sharper, toward argmax")
+        print(f"      softmax({f:>4} x s)  peak weight {sm(sc*f).max():.3f}   {tag}")
+    print(f"\n    masked entries exactly zero? {np.all(A[np.triu_indices(n,1)] == 0)}  because exp(-inf)=0")
+    print("      — which is why the mask is applied to SCORES, before softmax.")
 step("softmax → attention weights", s7)
 
 # ── 8 ────────────────────────────────────────────────────────────────────────
