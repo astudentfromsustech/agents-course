@@ -102,7 +102,25 @@
     </tbody>
   </table></div>
 
-  <p>Projecting through <code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> first fixes all four with one move. Here is why that works, and why it is less of a leap than it looks.</p>
+  <p>The fix is to stop comparing the token vectors directly. <b>Project each token's own vector
+  <code>aⁱ</code> through two learned matrices first</b>, then compare the results — and all four
+  problems go at once. Here is why that works, and why it is less of a leap than it looks.</p>
+
+  <div class="note">
+    <p><b>“Project” just means multiply by a matrix.</b> <code>qⁱ = W<sup>q</sup>aⁱ</code> takes the
+    token's full representation — say 4096 numbers — and re-expresses it as 128 numbers in a new
+    space. Nothing is added; a particular 128-dimensional view is extracted from what was already there.</p>
+    <p>The same vector <code>aⁱ</code> goes through <b>both</b> matrices, giving two different views
+    of the one token:</p>
+    <ul class="plain">
+      <li><code>qⁱ = W<sup>q</sup>aⁱ</code> — <b>what this token is looking for</b></li>
+      <li><code>kⁱ = W<sup>k</sup>aⁱ</code> — <b>what this token offers to be found by</b></li>
+    </ul>
+    <p>Every token produces both, because every token both asks and answers. The score that matters is
+    one token's <i>query</i> against another's <i>key</i> — never query against query. <span class="cm">(A
+    pedantic note, since you may know the term: in linear algebra a projection is idempotent, P² = P.
+    These are not. ML uses “project” loosely for any linear map into another space.)</span></p>
+  </div>
 
   <h4>The dot product already has a hidden assumption</h4>
 
