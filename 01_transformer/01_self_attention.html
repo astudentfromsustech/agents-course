@@ -80,6 +80,24 @@
 </header>
 
 <section id="selfattention">
+<div class="note">
+  <p><b>In one sentence.</b> Self-attention lets <b>every position pull in information from the other
+  positions it judges relevant</b> — with “relevant” being <i>learned</i>, <i>directional</i>, and
+  <i>recomputed for every input</i>.</p>
+  <p>Three near-misses are worth naming, because each one is a real idea that attention deliberately is
+  not:</p>
+  <div class="tw" style="margin:12px 0"><table>
+    <thead><tr><th>not quite…</th><th>why not</th></tr></thead>
+    <tbody>
+      <tr><td>“it finds <b>correlations</b> in the sequence”</td><td>Correlation is <b>symmetric</b> and <b>fixed</b>. Attention is asymmetric on purpose — a pronoun seeks its antecedent, not the reverse — and its notion of relatedness is <i>learned</i>, not a statistic.</td></tr>
+      <tr><td>“it finds the <b>similar</b> tokens”</td><td>Relevant is usually <i>not</i> similar. A verb wants a noun; a closing bracket wants its opener. See the four reasons below.</td></tr>
+      <tr><td>“it <b>finds</b> relationships”</td><td>Finding is only half. The scores are not the output — they are <b>routing weights</b> that decide which values get mixed into each position. Attention <i>moves information</i>; it does not report an analysis.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="cm">If that is all you take from this page, it is the right half. Everything below is why
+  each of those words — learned, directional, recomputed — is load-bearing.</p>
+</div>
+
 <h3 id="s-the-problem-attention-is-solving">The problem attention is solving</h3>
 
   <p>Before the mechanism, the goal. Given a sequence of vectors <code>a¹…aⁿ</code>, each output <code>b<sup>i</sup></code> must be built from <i>whichever other positions actually matter</i> for position <i>i</i> — and which ones matter differs for every token, every sentence, and every layer. It can't be fixed in advance, so it has to be computed from the content itself:</p>
