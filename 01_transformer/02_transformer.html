@@ -532,7 +532,7 @@
     </li>
     <li>
       <span class="st">MLP / feed-forward</span>
-      <span class="sd">A per-token two-layer net that expands to ~4× width and back. No token talks to another here. Roughly <b>two-thirds of all parameters</b> live in these layers, and they behave like key–value memories — this is where "Paris is in France" is stored. <b>Mixture-of-Experts</b> replaces one big MLP with many, routing each token to a few, buying capacity without buying FLOPs.</span>
+      <span class="sd"><b>MLP = multi-layer perceptron</b>; the original paper calls it the <i>position-wise feed-forward network</i> (FFN). Same thing, three names. It is two linear layers with a nonlinearity between them — <code>W₂·GELU(W₁x + b₁) + b₂</code> — expanding to ~4× width and back, applied <b>independently to each position</b>. No token talks to another here. Roughly <b>two-thirds of all parameters</b> live in these layers, and they behave like key–value memories — this is where "Paris is in France" is stored. <b>Mixture-of-Experts</b> replaces one big MLP with many, routing each token to a few, buying capacity without buying FLOPs.</span>
     </li>
     <li>
       <span class="st">Residual + normalization</span>

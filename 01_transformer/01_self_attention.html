@@ -196,7 +196,7 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
   <ol class="steps">
     <li><b>Additive attention</b> (Bahdanau, 2014) scored a query–key pair by running both through a
     small network: <code>score = vᵀ tanh(W₁h + W₂s)</code>. Learned and expressive, but it is an MLP
-    per pair — there is no way to batch <i>n²</i> of them into a matmul.</li>
+    (multi-layer perceptron) per pair — there is no way to batch <i>n²</i> of them into a matmul.</li>
     <li><b>Multiplicative attention</b> (Luong, 2015) replaced that network with <code>hᵀWs</code> —
     <b>the bilinear form, four years before the transformer</b>. Same expressiveness for the job,
     one matmul instead of an MLP.</li>
