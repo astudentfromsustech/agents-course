@@ -493,10 +493,43 @@ two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
     <p><b>Heads split the width, they don't add to it.</b> The intuitive worry is that 32 heads cost 32× — they don't. With <code>d_model = 4096</code> and 32 heads, each head works in <code>d_k = 128</code>, and <code>32 × 128 = 4096</code>: the same total dimension, <b>partitioned</b> rather than duplicated. Parameters and FLOPs are essentially unchanged from one wide head. What you get for free is <b>independence</b> — 32 separate score matrices that can specialize, instead of one that must compromise. That is close to the best trade in the architecture, and it's why every model uses many heads.</p>
   </div>
 
-  <h4>What the attention weights are good for, besides the output</h4>
+  <h4>What role the scores play inside the transformer</h4>
 
-  <p>Inside the model they have exactly one job: weight the values. But the matrix <code>A</code> is
-  also the most legible thing a transformer produces, and it gets used four ways:</p>
+  <p>Inside the forward pass the attention matrix has exactly one job, and naming it precisely is
+  worth more than any analogy: <b><code>A</code> holds the connection weights of the only path by
+  which information moves between positions — and unlike every other weight in the network, they are
+  computed from the input at run time rather than learned and frozen.</b></p>
+
+  <p>A transformer block is two alternating operations, and the division is absolute:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>sub-layer</th><th>moves information…</th><th>its weights are…</th></tr></thead>
+    <tbody>
+      <tr><td><b>attention</b></td><td><b>across positions</b> — the only place a token can see another token</td><td><b>computed per input</b>: <code>A = softmax(QKᵀ/√d_k)</code>, fresh for every sequence, every layer, every head</td></tr>
+      <tr><td><b>feed-forward</b></td><td><b>nowhere</b> — each position is transformed alone, in parallel, never consulting its neighbours</td><td>learned and fixed after training</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>So the scores are not a feature, a score in the ranking sense, or an intermediate value that gets
+  added to anything. <b>They are wiring.</b> An MLP's connectivity is fixed; a CNN's is fixed and
+  local. Attention's is <i>recomputed for every example</i> — which is the whole reason the same
+  layer handles "the cat sat" and a 100 000-token document.</p>
+
+  <div class="note">
+    <p><b>And they carry no content whatsoever.</b> This is the QK/OV split from earlier, stated as a
+    forward-pass fact: <code>A</code> decides <i>where to read from</i> and <code>V</code> supplies
+    <i>what is read</i>. Every number in <code>A</code> is a non-negative weight summing to 1 along a
+    row — it cannot encode meaning, only proportions. Swap in different values and the routing is
+    unchanged; swap in different scores and the same values get mixed differently.</p>
+    <p>In residual-stream terms: each layer reads from the stream and writes back into it. The scores
+    decide <b>which positions get read</b>; the OV circuit decides <b>what gets written</b>. Everything
+    a transformer does over long range is built from that one move, stacked.</p>
+  </div>
+
+  <h4>And what they are good for outside it</h4>
+
+  <p>Being the most legible thing a transformer produces, <code>A</code> also gets read from the
+  outside, four ways:</p>
 
   <div class="tw" style="margin:14px 0"><table>
     <thead><tr><th>use</th><th>what it means</th></tr></thead>
@@ -534,6 +567,47 @@ two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
     </div>
     <figcaption><b>Add a position vector before projecting.</b> Each position <i>i</i> gets its own <code>e<sup>i</sup></code>, added to the input as <code>e<sup>i</sup> + a<sup>i</sup></code> — so <code>q, k, v</code> all inherit it. Read the heat map as one column per position: each row is a sinusoid of a different frequency, fast at one end and slow at the other, so the column pattern never repeats and nearby positions get similar vectors. It's a continuous binary counter. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
+
+  <div class="note">
+    <p><b>Why not just append the position as a number?</b> It is the first thing anyone tries, and it
+    fails three ways: the value is <b>unbounded</b> (position 4000 arrives as a feature 4000× larger
+    than position 1 and swamps the layer norm), it is <b>one dimension against thousands</b> of content
+    dimensions, and it <b>does not generalise</b> — a model trained to 2 048 has never seen the number
+    5 000 and has no reason to treat it sensibly. You want something bounded, high-dimensional, and
+    smooth in position. Sinusoids are all three.</p>
+  </div>
+
+  <h4>Why sinusoids, and not any other bounded code</h4>
+
+  <p>"Continuous binary counter" explains why the pattern never repeats, but not why <i>these</i>
+  functions. The real reason is one property, and it is the whole design:</p>
+
+<pre><code>PE(pos)<sub>2i</sub>   = sin(ω<sub>i</sub> · pos)        ω<sub>i</sub> = 1 / 10000<sup>2i/d</sup>
+PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
+
+<span class="cm"># take any fixed offset k. For each (sin, cos) pair:</span>
+
+[ sin(ω(pos+k)) ]   [ cos ωk   sin ωk ] [ sin(ω·pos) ]
+[ cos(ω(pos+k)) ] = [ -sin ωk  cos ωk ] [ cos(ω·pos) ]
+                     └──── R(ωk) ────┘   <span class="cm"># a rotation. Depends on k, NOT on pos.</span></code></pre>
+
+  <p><b><code>PE(pos+k)</code> is a fixed linear function of <code>PE(pos)</code>.</b> Each
+  <code>(sin, cos)</code> pair is a 2D vector spinning at its own rate, and moving <i>k</i> steps
+  rotates every pair by an angle that depends only on <i>k</i>. So a single learned linear map — which
+  is exactly what <code>W<sup>q</sup></code> and <code>W<sup>k</sup></code> are — can implement
+  "attend three tokens back", and the same map works at position 5 and position 500.</p>
+
+  <div class="note">
+    <p><b>Which makes RoPE a small step, not a new idea.</b> Sinusoidal encoding gives you
+    rotation-by-position, then <i>adds</i> it to the input and hopes the projections recover it. RoPE
+    applies the same rotation <b>directly to <code>q</code> and <code>k</code></b>. Then in the score
+    the two rotations meet:</p>
+<pre><code>(R<sub>m</sub>q) · (R<sub>n</sub>k)  =  q ᵀR<sub>m</sub>ᵀR<sub>n</sub> k  =  q ᵀR<sub>n−m</sub> k      <span class="cm"># absolute positions cancel</span></code></pre>
+    <p>The score depends only on <b><code>n − m</code></b>, the <i>relative</i> offset. Nothing is
+    added to the residual stream, nothing has to be recovered, and a distance of 3 means the same thing
+    at position 10 and position 10 000 — which is why it extrapolates past the training length so much
+    better.</p>
+  </div>
 
   <p>Two things about that slide have dated, and both are worth knowing. <b>"Hand-crafted" is no longer the norm</b> — GPT-2 and BERT learned absolute position embeddings instead, and current models overwhelmingly use <b>RoPE</b>, which doesn't add anything to <code>a<sup>i</sup></code> at all. RoPE <i>rotates</i> <code>q</code> and <code>k</code> by an angle proportional to position, so the dot product between them ends up depending only on their <b>relative</b> distance — which is usually what actually matters, and extrapolates to lengths never seen in training far better than absolute encodings do.</p>
 
