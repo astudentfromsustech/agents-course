@@ -62,6 +62,11 @@ python3 resources/_check_notebooks.py          # report
 python3 resources/_check_notebooks.py --fix    # repair newlines in place
 ```
 
+⚠️ **`check.py` reports a false FAIL on these pages.** Its "folds on the page ground" test looks for a
+`.card` ancestor, which is the `html_build` skill's vocabulary; this course uses `.note` instead. A fold
+inside a `.note` is correctly nested but still counted. **Read the `heading order` and `tag errors`
+lines, not the exit code** — and verify nesting with the enclosing-div check rather than trusting either.
+
 🔴 **nbformat concatenates a cell's `source` list with NO separator**, so every line must carry its
 own trailing `\n`. A list built with `split("\n")` loses them: Colab renders the notebook as one
 run-together line and the code does not parse — while any check that re-joins with `"\n"` reports

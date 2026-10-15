@@ -107,6 +107,25 @@
   <p>Before the mechanism, the map — because attention on its own predicts nothing. It is <b>one
   sub-layer, inside a block, that repeats</b>.</p>
 
+  <div class="note">
+    <p><b>So what does that sub-layer actually do?</b> It takes <code>n</code> vectors and returns
+    <code>n</code> vectors, where each output is a blend of the inputs — and <i>each position chooses
+    its own blend</i>. Nothing is created and nothing is removed; information is <b>moved</b>.</p>
+    <p>The effect on a single token's vector is the thing to hold on to:</p>
+<pre><code>before attention   this token, alone
+after  attention   this token, <b>in this context</b></code></pre>
+    <p>Worked on one sentence — <i>“The animal didn't cross the street because <b>it</b> was too
+    tired.”</i> At the <code>it</code> position, <code>it</code>'s query matches <code>animal</code>'s
+    key more strongly than <code>street</code>'s, so the output at that position comes back carrying
+    <code>animal</code>'s value. <b>The pronoun has been resolved</b> — not by a grammar rule, but by a
+    weighted read the model learned to perform. The MLP that follows then works on a vector that
+    already knows what <code>it</code> refers to.</p>
+    <p>And because the block repeats, this compounds: an early layer may settle local syntax, a middle
+    one a long-range reference, a later one the gist of the whole passage. <b>Each pass lets every
+    token see one hop further</b>, through whatever the previous pass already gathered — which is
+    exactly the two-layer composition <code>p1</code> catches in the act.</p>
+  </div>
+
   <p>The model below is the <b>decoder-only</b> stack: GPT-style, and what essentially every current
   LLM is. Worth naming, because it is <i>not</i> the architecture in the 2017 paper:</p>
 
