@@ -216,6 +216,26 @@ after  attention   this token, <b>in this context</b></code></pre>
 
   <p>Before the mechanism, the goal. Given a sequence of vectors <code>a¹…aⁿ</code>, each output <code>b<sup>i</sup></code> must be built from <i>whichever other positions actually matter</i> for position <i>i</i> — and which ones matter differs for every token, every sentence, and every layer. It can't be fixed in advance, so it has to be computed from the content itself:</p>
 
+  <div class="note">
+    <p><b>What exactly are <code>a¹…aⁿ</code>?</b> Vectors — <b>already embedded</b>. Attention never
+    sees characters, words, or token IDs. Before it runs, the text has been tokenized to integer IDs
+    and each ID has looked up a learned vector of width <code>d_model</code>.</p>
+    <p>But which vectors depends on <i>where in the stack you are</i>, and this is the part worth
+    pinning down:</p>
+    <div class="tw" style="margin:12px 0"><table>
+      <thead><tr><th>layer</th><th><code>aⁱ</code> is…</th></tr></thead>
+      <tbody>
+        <tr><td><b>the first block</b></td><td>the token embedding, plus position — “this word, somewhere in the sentence”</td></tr>
+        <tr><td><b>every later block</b></td><td><b>the residual stream</b> at that point: that position's running vector, already edited by every block before it</td></tr>
+      </tbody>
+    </table></div>
+    <p>So in block 1, <code>a³</code> means roughly <i>“the token 'street'.”</i> By block 20 the vector
+    at position 3 may encode <i>“the thing the pronoun later refers to, in a sentence about an animal
+    being tired”</i> — same slot, same shape, accumulated meaning. <b>Attention does not know or care
+    which</b>; it takes <code>n</code> vectors and returns <code>n</code> vectors, which is exactly
+    what lets the identical layer run at the bottom of the stack and at the top.</p>
+  </div>
+
   <figure>
     <div class="slide">
       <img src="../resources/figures/selfattn_relevance_lee.png"
