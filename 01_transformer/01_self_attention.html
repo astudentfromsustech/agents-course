@@ -31,6 +31,7 @@
           <li class="l3"><a href="#s-self-attention-vs-cnn-the-same-operation-one-w">Self-attention vs CNN: the same operation, one with its receptive field frozen</a></li>
           <li class="l3"><a href="#s-self-attention-vs-rnn-why-the-recurrence-went">Self-attention vs RNN: why the recurrence went away</a></li>
           <li class="l3"><a href="#s-graphs-attention-with-the-edges-supplied">Graphs: attention with the edges supplied</a></li>
+          <li class="l3"><a href="#s-worked-case-a-hi-c-contact-matrix">Worked case: a Hi-C contact matrix</a></li>
         </ul>
       </li>
       <li><a href="../01_transformer/02_transformer.html">— architecture</a>
@@ -887,7 +888,64 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
 </section>
 
 
-<div class="tryit">
+<h3 id="s-worked-case-a-hi-c-contact-matrix">Worked case: a Hi-C contact matrix</h3>
+
+  <p>The course's capstone is a 3D-genomics agent, so it is worth doing one domain case properly. Say
+  the input is an <code>n × n</code> Hi-C contact matrix. <b>Attention needs a set of vectors — so the
+  only question that matters is: what is one token?</b> There are three defensible answers, and they
+  build different models.</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>design</th><th>one token is…</th><th>the contact matrix is…</th><th>good for</th></tr></thead>
+    <tbody>
+      <tr><td><b>patches</b><br><span class="cm">ViT-style</span></td><td>a tile of the map, e.g. 16×16 bins, flattened</td><td><b>the input image</b></td><td>learning map structure itself — denoising, resolution enhancement, calling loops and TADs. The shape Hi-C foundation models take</td></tr>
+      <tr><td><b>bins</b><br><span class="cm">graph-style</span></td><td>one genomic bin, carrying its own features (epigenomic tracks, say)</td><td><b>an attention bias or mask</b> over bin pairs — exactly “<a href="#s-graphs-attention-with-the-edges-supplied">let the edges decide the matrix</a>” above</td><td>reasoning over loci when you already trust the contacts and want to propagate signal along them</td></tr>
+      <tr><td><b>sequence</b><br><span class="cm">Akita / Orca-style</span></td><td>a bin of DNA sequence</td><td><b>the target, not the input</b> — you predict it</td><td>asking what the sequence itself determines about folding</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <p><b>Will it be embedded? Yes — always, and that is not optional.</b> Attention consumes vectors of
+    width <code>d_model</code>, so whatever you choose as a token, something has to produce that vector.
+    The only difference from text is <i>how</i>:</p>
+    <div class="tw" style="margin:12px 0"><table>
+      <thead><tr><th>input</th><th>embedding is…</th></tr></thead>
+      <tbody>
+        <tr><td>text</td><td>a <b>lookup table</b>: a discrete vocabulary indexes a learned row</td></tr>
+        <tr><td>a Hi-C patch, or any continuous input</td><td>a <b>linear projection</b>: flatten the 16×16 tile to 256 numbers, multiply by a learned <code>256 × d_model</code> matrix</td></tr>
+      </tbody>
+    </table></div>
+    <p>Both are "the embedding layer" and both are learned. A vocabulary lookup is just a matmul with a
+    one-hot vector, so the two are the same operation — Hi-C simply skips the one-hot. And position
+    still has to be injected: for patches it is <b>2D</b> (which row-block, which column-block), not the
+    1D offset text uses.</p>
+  </div>
+
+  <h4>Three things that will bite you, in this order</h4>
+
+  <ol class="steps">
+    <li><b><code>n²</code> is not survivable at genomic scale.</b> At 10 kb bins the human genome is
+    ~300 000 bins — <code>9 × 10¹⁰</code> pairs for one score matrix. This is the same wall ViT hit at
+    224×224 pixels, and the same answer applies: <b>patches, windows, or sparse attention are mandatory,
+    not an optimisation.</b> Decide your receptive field before anything else; it fixes what questions
+    the model can even pose.</li>
+    <li><b>The diagonal dominates — for real this time.</b> Contact frequency decays as a power law with
+    genomic distance, so raw counts near the diagonal swamp everything. Feed those in and the model
+    learns <i>distance</i> and nothing else. Normalize first — observed/expected, or distance-stratified
+    — and note the irony: this is the same failure as the raw dot product <a href="#s-why-relevance-has-to-be-learned">above</a>,
+    where <code>aⁱ·aⁱ</code> necessarily dominated its row. Different cause, identical symptom.</li>
+    <li><b>Hi-C is symmetric; attention is not.</b> <code>contact(i,j) = contact(j,i)</code>, but
+    <code>Wᑫ ≠ Wᵏ</code> exists precisely so that <code>α<sub>i,j</sub> ≠ α<sub>j,i</sub></code>. That is
+    not a conflict — it means a bin-level model can learn <i>directional</i> relations the matrix itself
+    cannot express. Worth knowing you have that freedom, and worth checking whether your evaluation
+    assumes symmetry when your model no longer has it.</li>
+  </ol>
+
+  <p class="handoff">Which design is right depends on the question, and that decision belongs to the
+  capstone rather than this page. The point here is narrower: <b>nothing about attention changed.</b>
+  Vectors in, vectors out, scores from queries and keys. Only the answer to “what is one token?” moved.</p>
+
+  <div class="tryit">
   <p><b>Go and run one.</b> Attention is the rare idea where the interactive explanations are genuinely better than the prose — including this page's. Seven, ordered by how much work they ask of you. The first two are hands-on labs in this repo; the third is the source of this page's own figures. All verified live 2026-10-09.</p>
 
   <div class="tw" style="margin:14px 0 4px"><table>
