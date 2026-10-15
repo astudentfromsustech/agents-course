@@ -85,8 +85,12 @@
   <p><b>In one sentence.</b> Self-attention lets <b>every position pull in information from the other
   positions it judges relevant</b> — with “relevant” being <i>learned</i>, <i>directional</i>, and
   <i>recomputed for every input</i>.</p>
-  <p>Three near-misses are worth naming, because each one is a real idea that attention deliberately is
-  not:</p>
+  <p class="cm">Everything below is why each of those words — <i>learned</i>, <i>directional</i>,
+  <i>recomputed</i> — is load-bearing.</p>
+
+  <details class="more">
+    <summary>Three near-misses, and why each is wrong</summary>
+    <p>Each is a real idea that attention deliberately is <i>not</i>:</p>
   <div class="tw" style="margin:12px 0"><table>
     <thead><tr><th>not quite…</th><th>why not</th></tr></thead>
     <tbody>
@@ -95,8 +99,7 @@
       <tr><td>“it <b>finds</b> relationships”</td><td>Finding is only half. The scores are not the output — they are <b>routing weights</b> that decide which values get mixed into each position. Attention <i>moves information</i>; it does not report an analysis.</td></tr>
     </tbody>
   </table></div>
-  <p class="cm">If that is all you take from this page, it is the right half. Everything below is why
-  each of those words — learned, directional, recomputed — is load-bearing.</p>
+  </details>
 </div>
 
 <h3 id="s-where-this-sits-in-the-model">Where this sits in the model</h3>

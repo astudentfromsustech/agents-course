@@ -306,3 +306,23 @@ ul.toc-prac li.nb a::after{content:"▶"; font-size:9px; color:var(--green); fle
 ul.toc-prac li.gpu a::after{content:"▶"; font-size:9px; color:var(--green); flex:none}
 ul.toc-prac li.py a::after{content:"✎"; font-size:10px; color:var(--ink-3); flex:none}
 ul.toc-prac li.doc a::after{content:"↗"; font-size:9px; color:var(--ink-3); flex:none}
+
+/* ---------- compact inline fold, for optional depth inside a note/card ---------- */
+details.more{margin:10px 0 2px}
+details.more > summary{
+  cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:7px;
+  font-size:13.5px; font-weight:620; color:var(--accent);
+  -webkit-tap-highlight-color:transparent; user-select:none;
+}
+details.more > summary::-webkit-details-marker{display:none}
+details.more > summary::marker{content:""}
+details.more > summary::before{
+  content:""; width:0; height:0; flex:none;
+  border-left:5px solid currentColor; border-top:4px solid transparent;
+  border-bottom:4px solid transparent; transition:transform .18s ease;
+}
+details.more[open] > summary::before{transform:rotate(90deg)}
+details.more > summary:hover{text-decoration:underline}
+details.more > summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:3px}
+details.more[open] > summary{margin-bottom:8px}
+details.more > :not(summary){font-size:15px}
