@@ -18,7 +18,7 @@
       </li>
       <li class="here"><a href="../01_transformer/01_self_attention.html"><i>01</i>Transformer</a>
         <ul class="toc-sec">
-          <li class="l3"><a href="#s-where-this-sits-in-the-model">Where this sits in the model</a></li>
+          <li class="l3"><a href="#s-where-this-sits-a-decoder-only-transformer">Where this sits: a decoder-only transformer</a></li>
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
           <li class="l3"><a href="#s-why-relevance-has-to-be-learned">Why relevance has to be learned</a></li>
           <li class="l3"><a href="#s-the-mechanism-score-weight-read">The mechanism: score, weight, read</a></li>
@@ -102,10 +102,28 @@
   </details>
 </div>
 
-<h3 id="s-where-this-sits-in-the-model">Where this sits in the model</h3>
+<h3 id="s-where-this-sits-a-decoder-only-transformer">Where this sits: a decoder-only transformer</h3>
 
   <p>Before the mechanism, the map — because attention on its own predicts nothing. It is <b>one
-  sub-layer, inside a block, that repeats</b>:</p>
+  sub-layer, inside a block, that repeats</b>.</p>
+
+  <p>The model below is the <b>decoder-only</b> stack: GPT-style, and what essentially every current
+  LLM is. Worth naming, because it is <i>not</i> the architecture in the 2017 paper:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>shape</th><th>used for</th><th>attention in it</th></tr></thead>
+    <tbody>
+      <tr><td><b>decoder-only</b><br><span class="cm">GPT, Llama — the diagram below</span></td><td>generation: predict the next token, forever</td><td>self-attention, <b>causally masked</b> so position <i>i</i> cannot see past itself</td></tr>
+      <tr><td><b>encoder-only</b><br><span class="cm">BERT and relatives</span></td><td>understanding a whole input at once — classification, embeddings</td><td>self-attention, <b>unmasked</b> — every token sees every token</td></tr>
+      <tr><td><b>encoder–decoder</b><br><span class="cm">the original 2017 transformer</span></td><td>translation: one sequence in, a different one out</td><td>all three — masked self-attention in the decoder, unmasked in the encoder, plus <b>cross</b>-attention between them</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><b>The mechanism on this page is identical in all three.</b> What changes is only the wiring
+  around it: whether a mask is applied, and whether keys and values come from the same sequence as the
+  queries (self-attention) or a different one (cross-attention). <a href="02_transformer.html">Part
+  2</a> builds the encoder–decoder version and covers cross-attention; this page stays with the
+  decoder-only case, because it is the one the rest of the course needs.</p>
 
   <figure>
     <div class="svgbox">
@@ -153,7 +171,7 @@
       <text x="150" y="236" class="wm">same n×d in, same n×d out — which is exactly why blocks stack</text>
     </svg>
     </div>
-    <figcaption>Attention never changes the shape. It only changes <i>what is in</i> each position's vector — by mixing in the other positions.</figcaption>
+    <figcaption><b>A decoder-only transformer, end to end.</b> Attention never changes the shape. It only changes <i>what is in</i> each position's vector — by mixing in the other positions.</figcaption>
   </figure>
 
   <p>Three things follow, and they are what makes the rest of the page make sense:</p>
