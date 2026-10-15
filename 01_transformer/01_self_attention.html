@@ -916,9 +916,27 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
       </tbody>
     </table></div>
     <p>Both are "the embedding layer" and both are learned. A vocabulary lookup is just a matmul with a
-    one-hot vector, so the two are the same operation — Hi-C simply skips the one-hot. And position
-    still has to be injected: for patches it is <b>2D</b> (which row-block, which column-block), not the
-    1D offset text uses.</p>
+    one-hot vector, so <b>mechanically they are the same operation</b> — Hi-C simply skips the one-hot.
+    And position still has to be injected: for patches it is <b>2D</b> (which row-block, which
+    column-block), not the 1D offset text uses.</p>
+
+    <details class="more">
+      <summary>But they do different jobs — four differences worth knowing</summary>
+      <div class="tw" style="margin:4px 0 10px"><table>
+        <thead><tr><th></th><th>English words</th><th>Hi-C patches</th></tr></thead>
+        <tbody>
+          <tr><td><b>input</b></td><td><b>discrete</b> — a finite vocabulary (~50k). Each token owns a separate learned row; nothing lies between <code>cat</code> and <code>dog</code></td><td><b>continuous</b> — no vocabulary at all. Two similar tiles get similar vectors <i>automatically</i>, because a linear map is smooth, and a tile never seen still embeds sensibly</td></tr>
+          <tr><td><b>size</b></td><td><code>50 000 × 4096 ≈ 200M</code> parameters — often the single largest matrix in a small model</td><td><code>256 × 4096 ≈ 1M</code> — negligible</td></tr>
+          <tr><td><b>what it learns</b></td><td><b>meaning.</b> It is a knowledge store; the famous <code>king − man + woman ≈ queen</code> geometry lives in this table</td><td><b>features.</b> It is a feature extractor, much closer to the first convolution layer of a CNN than to a dictionary</td></tr>
+          <tr><td><b>tied to the output?</b></td><td>often <b>yes</b> — the same matrix runs in reverse to produce logits over the same vocabulary</td><td>only if you are reconstructing patches, which masked-patch models do. Otherwise there is no vocabulary to predict back into</td></tr>
+        </tbody>
+      </table></div>
+      <p>One practical consequence of the discrete/continuous split: <b>continuous inputs must be
+      scaled before projection and discrete ones need not be.</b> A lookup row is whatever training
+      made it; a raw Hi-C tile spans orders of magnitude and will dominate or vanish depending on where
+      on the diagonal it came from. That is the same normalization point as trap 2 below, arriving one
+      step earlier in the pipeline.</p>
+    </details>
   </div>
 
   <h4>Three things that will bite you, in this order</h4>
