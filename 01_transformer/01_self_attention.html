@@ -20,6 +20,7 @@
         <ul class="toc-sec">
           <li class="l3"><a href="#s-where-this-sits-a-decoder-only-transformer">Where this sits: a decoder-only transformer</a></li>
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
+          <li class="l3"><a href="#s-before-attention-how-a-word-becomes-a-vector">Before attention: how a word becomes a vector</a></li>
           <li class="l3"><a href="#s-why-relevance-has-to-be-learned">Why relevance has to be learned</a></li>
           <li class="l3"><a href="#s-the-mechanism-score-weight-read">The mechanism: score, weight, read</a></li>
           <li class="l3"><a href="#s-why-three-projections-and-how-they-relate">Why three projections, and how they relate</a></li>
@@ -237,6 +238,70 @@ after  attention   this token, <b>in this context</b></code></pre>
     what lets the identical layer run at the bottom of the stack and at the top.</p>
   </div>
 
+  <h3 id="s-before-attention-how-a-word-becomes-a-vector">Before attention: how a word becomes a vector</h3>
+
+  <p>That note says <code>aⁱ</code> arrives already embedded. Here is the step it skips — and it is
+  worth seeing, because the usual phrase “embedding lookup” hides what is actually happening.</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/tokenizer_onehot_wang.png"
+           alt="Words 苹果, 香蕉, 梨 (apple, banana, pear) pass into a tokenizer, which maps each to an index on a number line — 1, 2, 3, up to 1000 — and then to a one-hot encoding. A cube shows the three resulting unit vectors (1,0,0), (0,1,0) and (0,0,1) along the three coordinate axes.">
+    </div>
+    <figcaption><b>Tokenizer, then one-hot.</b> Each word becomes an index, then a vector that is all
+    zeros except a single 1. Note what that means geometrically: <b>every word is its own coordinate
+    axis</b>, and all words are mutually orthogonal and equidistant. Apple is exactly as far from
+    banana as from pear. No meaning has been encoded yet — only identity. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <p>That orthogonality is the problem the embedding solves. A one-hot vector of length <code>M</code>
+  (the vocabulary) is multiplied by an <code>M × N</code> matrix, and out comes a vector of length
+  <code>N</code> — much smaller, and no longer orthogonal to its neighbours:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/embedding_basis_change_wang.png"
+           alt="Three panels. Left: a one-hot row vector of length M, indices 0 to M with position i marked, multiplied by an M by N matrix whose column j is highlighted, producing a dense output vector of length N. Middle: a vector T expressed in a two-dimensional basis as a times e1 plus b times e2, then re-expressed in a three-dimensional basis as x e-prime-1 plus y e-prime-2 plus z e-prime-3. Right: the algebra — e1 equals the row of weights w11, w12, w13 and e2 equals w21, w22, w23, so T equals the transpose of the vector a, b multiplied by the two-by-three weight matrix, giving x equals a w11 plus b w21, and similarly for y and z.">
+    </div>
+    <figcaption><b>The embedding matrix is a change of basis.</b> Read the right-hand panel: each
+    <i>row</i> of the matrix is <b>where one old basis vector lands in the new space</b> —
+    <code>e₁ → (w₁,₁, w₁,₂, w₁,₃)</code>. Multiplying by the matrix just re-expresses the same vector in
+    that new basis. And because the input is one-hot, the product <i>selects a single row</i> — which
+    is exactly why this is usually called a “lookup”. <b>The lookup and the matrix multiply are the same
+    operation.</b> <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="note">
+    <p><b>Why that reframing is worth the trouble.</b> “Lookup table” suggests a filing cabinet — a
+    vector stored per word, nothing more. “Change of basis” says what the table is <i>for</i>: the new
+    axes need not be orthogonal, so the new coordinates can place related words near one another. The
+    geometry is the point. It is also the cleanest way to see why the embedding for a Hi-C patch is the
+    <a href="#s-worked-case-a-hi-c-contact-matrix">same operation</a> — no one-hot to select a row, so
+    the matrix acts on the whole input instead of picking from it.</p>
+
+    <details class="more">
+      <summary>The new basis need not be orthogonal — which is what lets it encode anything</summary>
+      <figure>
+        <div class="slide">
+          <img src="../resources/figures/embedding_basis_rotation_wang.png"
+               alt="Four columns. The first repeats the one-hot times matrix pipeline. The remaining three each show a vector T in an original red basis e1, e2 above, and below the same vector re-expressed in a new green basis: first in three non-orthogonal axes, then rotated so T appears as T-prime at a different angle, then in a skewed basis where the green axes are clearly not perpendicular.">
+        </div>
+        <figcaption>The same vector, several different bases. The new axes can be rotated, skewed, or
+        non-orthogonal — and the vector's <i>coordinates</i> change completely while the vector itself
+        does not. Choosing those axes is what training the embedding matrix means. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+      </figure>
+      <figure>
+        <div class="slide">
+          <img src="../resources/figures/embedding_any_relation_wang.png"
+               alt="The one-hot to matrix to embedded-vector pipeline on the left, and on the right the several basis-change panels stacked as layered planes in three dimensions, suggesting many such transformations composed. A subtitle reads 或者是其他的任何的关系, or any other relationship.">
+        </div>
+        <figcaption>Stack enough of those and the matrix can express — in the video's words —
+        <i>或者是其他的任何的关系</i>, “or any other relationship”. That is the whole claim behind a
+        learned embedding. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+      </figure>
+    </details>
+  </div>
+
   <figure>
     <div class="slide">
       <img src="../resources/figures/selfattn_relevance_lee.png"
@@ -310,6 +375,19 @@ qⁱ   d_k × 1          128 × 1     <b>= W<sup>q</sup>aⁱ</b>   (128×4096)(4
   <p>The generalisation writes itself. Replace <code>I</code> with something learned:</p>
 
 <pre><code>score(aⁱ, aʲ)  =  aⁱᵀ <b>M</b> aʲ      <span class="cm"># M learned instead of assumed</span></code></pre>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/quadratic_form_wang.png"
+           alt="Left: three vectors T1, T2 and T3 drawn in a basis e1, e2, all lying close to one straight dashed line. An arrow leads to the right panel, where the same three vectors appear in a new basis e-prime-1, e-prime-2 and now spread around a dashed ellipse. Below, the expression P of x equals x transpose A x is shown as analogous to f of x equals a x squared.">
+    </div>
+    <figcaption><b>The same idea from the linear-algebra side.</b> <code>P(x) = xᵀAx</code> is to
+    <code>f(x) = ax²</code> what a matrix is to a number — the <b>quadratic form</b>, the matrix
+    generalisation of “multiply by a coefficient”. A single <code>a</code> scales; a whole <code>A</code>
+    can stretch, rotate and skew, turning a line of vectors into an ellipse. <code>aⁱᵀ M aʲ</code> is the
+    two-argument version of exactly this, which is why replacing <code>I</code> with a learned
+    <code>M</code> is the natural move rather than a clever one. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
 
   <div class="note">
     <p><b>What the off-diagonal entries buy, and it is the whole point.</b> <code>M[7,3] ≠ 0</code>
@@ -1014,7 +1092,7 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
   <a href="../01_transformer/02_transformer.html"><span class="lbl">next</span><span class="ttl">The transformer</span><span class="sub">Attention is one half of a block. Here is the stack it lives in — tokenizer to logits.</span></a>
   <a href="../00_overview/00_overview.html"><span class="lbl">back</span><span class="ttl">Overview</span><span class="sub">How transformer, LLM and agent compose — the three-layer map.</span></a>
 </div>
-<p class="foot">knowledge_to_learn / agents — study notes. Slides from Hung-yi Lee's Machine Learning course (NTU); diagrams and commentary written alongside them.</p>
+<p class="foot">knowledge_to_learn / agents — study notes. Embedding and quadratic-form figures from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili). Remaining slides from Hung-yi Lee's Machine Learning course (NTU); diagrams and commentary written alongside them.</p>
 </div>
 <script src="../resources/toc.js" defer></script>
 </body>
