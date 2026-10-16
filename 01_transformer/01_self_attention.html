@@ -24,6 +24,7 @@
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
           <li class="l3"><a href="#s-before-attention-how-a-word-becomes-a-vector">Before attention: how a word becomes a vector</a></li>
           <li class="l3"><a href="#s-where-the-embedding-matrix-comes-from">Where the embedding matrix comes from: word2vec</a></li>
+          <li class="l3"><a href="#s-what-context-does-to-a-dictionary-entry">What context does to a dictionary entry</a></li>
           <li class="l3"><a href="#s-why-relevance-has-to-be-learned">Why relevance has to be learned</a></li>
           <li class="l3"><a href="#s-the-mechanism-score-weight-read">The mechanism: score, weight, read</a></li>
           <li class="l3"><a href="#s-why-three-projections-and-how-they-relate">Why three projections, and how they relate</a></li>
@@ -152,6 +153,46 @@ after  attention   this token, <b>in this context</b></code></pre>
   queries (self-attention) or a different one (cross-attention). <a href="02_transformer.html">Part
   2</a> builds the encoder–decoder version and covers cross-attention; this page stays with the
   decoder-only case, because it is the one the rest of the course needs.</p>
+
+  <figure>
+    <div class="slide portrait" style="max-width:420px">
+      <img src="../resources/figures/transformer_fullarch_wang.png"
+           alt="The original 2017 transformer architecture. On the left an encoder column: Inputs feed an Input Embedding, a positional encoding is added, then N identical blocks each containing Multi-Head Attention followed by Add and Norm, then Feed Forward followed by Add and Norm. On the right a decoder column: Outputs shifted right feed an Output Embedding, positional encoding is added, then N blocks each containing Masked Multi-Head Attention and Add and Norm, a Multi-Head Attention fed by arrows from the encoder output, then Feed Forward. The decoder ends in Linear, Softmax, and Output Probabilities.">
+    </div>
+    <figcaption>The 2017 encoder–decoder, for reference. The page below is the <b>right-hand column
+    alone</b>, with the middle block (the one the encoder arrows feed) removed. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="note">
+    <p><b>At training time, both sides are inputs.</b> The diagram reads like a pipeline, but a
+    translation model is trained by feeding the Chinese <i>and</i> its English counterpart in at once —
+    left column and right column simultaneously. What comes out of the top is not a translation, it is
+    a <b>loss</b>, and backpropagation walks it back into every parameter. The sequential, one-token-
+    at-a-time behaviour you see from a deployed model is an <i>inference</i> behaviour; it is not how
+    the thing was trained. (Why that gap matters:
+    <a href="#s-parallel-to-train-sequential-to-generate">parallel to train, sequential to generate</a>.)</p>
+  </div>
+
+  <p>Two stages, in the author's framing — and the whole of this page is the second one:</p>
+
+  <div class="duo">
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/transformer_embeddings_wang.png"
+             alt="A crop of the architecture diagram with a red rectangle drawn around both the Input Embedding and Output Embedding boxes and their incoming arrows labelled Inputs and Outputs shifted right.">
+      </div>
+      <figcaption><b>Prepare the dictionary.</b> Look up each token's meaning on its own — and these
+      matrices are <b>trained, not fixed</b>. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/transformer_attention_blocks_wang.png"
+             alt="A crop of the architecture diagram with red rectangles drawn around the encoder's Multi-Head Attention block and the decoder's Masked Multi-Head Attention block.">
+      </div>
+      <figcaption><b>Read the combination.</b> What the words <i>together</i> mean has to be worked out
+      on top of that — and this is the core. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </div>
 
   <figure>
     <div class="svgbox">
@@ -401,6 +442,51 @@ after  attention   this token, <b>in this context</b></code></pre>
   dictionary; <b>self-attention reads the sentence</b> — it is the layer that takes those
   author-independent vectors and lets a particular context bend them.</p>
 
+  <h3 id="s-what-context-does-to-a-dictionary-entry">What context does to a dictionary entry</h3>
+
+  <p>Here is that handoff made concrete. 美女 is in the dictionary with one objective entry:
+  <i>a beautiful woman</i>. Now put it in two sentences:</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>the sentence</th><th>what 美女 now means</th></tr></thead>
+    <tbody>
+      <tr><td>美女 <span class="cm">— on its own</span></td><td>the dictionary entry, unmodified: good-looking</td></tr>
+      <tr><td>美女，加一下微信<br><span class="cm">“Miss, let's swap WeChat”</span></td><td>the entry, more or less intact — the speaker probably does mean it</td></tr>
+      <tr><td>美女，麻烦让一下<br><span class="cm">“Miss, excuse me, coming through”</span></td><td>the entry, largely drained — it has become a form of address and says nothing about looks</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Nothing changed about the token. What changed is the company it is keeping. So:</p>
+
+  <div class="note">
+    <p><b>A sentence's meaning is the dictionary's meanings, expanded and edited — and the edit is
+    hidden in the context.</b> That is the job. Attention's specific task is to work out
+    <b>how much, and in which direction</b>, each surrounding token revises each other token's
+    objective entry.</p>
+  </div>
+
+  <p>Read the attention formula with that sentence in hand and it stops being arbitrary:</p>
+
+  <figure>
+    <div class="slide portrait" style="max-width:320px">
+      <img src="../resources/figures/attention_formula_aprime_wang.png"
+           alt="A boxed formula: softmax of Q dot K transpose divided by the square root of D out, all multiplied by V, with the whole expression labelled A prime underneath.">
+    </div>
+    <figcaption><span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>term</th><th>what it is</th></tr></thead>
+    <tbody>
+      <tr><td><code>V</code></td><td><b>the objective meaning, as looked up</b> — the dictionary entry word2vec compiled, one row per token</td></tr>
+      <tr><td><code>softmax(QKᵀ/√D<sub>out</sub>)</code></td><td><b>the edit coefficients</b> — how strongly this context revises each entry</td></tr>
+      <tr><td>the product</td><td>the entry <i>after</i> this particular sentence has had its say</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Which leaves exactly one question, and it is the one the rest of this page answers:
+  <b>why should <code>QKᵀ</code> produce the right coefficients?</b> Nothing so far says it must.</p>
+
   <figure>
     <div class="slide">
       <img src="../resources/figures/selfattn_relevance_lee.png"
@@ -564,6 +650,20 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
     <li><b>The projections narrow.</b> <code>W<sup>q</sup>, W<sup>k</sup></code> map <code>d_model</code> (≈4096) down to <code>d_k</code> (≈128), so each head compares only the slice it cares about — and scoring all pairs gets ~32× cheaper.</li>
     <li><b>The score is scaled:</b> <code>α = q·k/√d_k</code>. The variance of a dot product grows with <code>d_k</code>, and unscaled scores of ±11 saturate the softmax into a near one-hot distribution where the gradient vanishes.</li>
   </ul>
+
+  <details class="more">
+    <summary>Where the √ comes from</summary>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/attention_scaling_variance_wang.png"
+             alt="A derivation. At the top, Q times K transpose equals A, drawn as matrices. Below, X and Y transpose are each assumed standard normal with identity covariance, so each component X-i and Y-j is N(0,1). Then the dot product X dot Y transpose is the sum over i from 1 to D-out of X-i Y-i, and its variance is the sum of D-out ones, equal to D-out — boxed as X dot Y transpose distributed as N(0, D-out times I). A side calculation shows Var(X-i Y-i) expands to E(X-i squared)E(Y-i squared) minus E(X-i) squared E(Y-i) squared, which equals (1+0)(1+0) minus 0, equal to 1.">
+      </div>
+      <figcaption>Take <code>q</code> and <code>k</code> components as independent <code>N(0,1)</code>.
+      Each product term then has variance 1, and the dot product sums <code>d_k</code> of them — so
+      <b>Var = d<sub>k</sub></b>, and dividing by <code>√d<sub>k</sub></code> returns it to 1. The
+      scale is chosen to be <i>exactly</i> the standard deviation it has to cancel. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </details>
 
   <h4>Weights: softmax over the scores</h4>
   <p>Now run that module once per position and normalize the results — one query against every key:</p>
@@ -779,7 +879,18 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
     <p><b>Don't let the transposes confuse you — they're the same equation.</b> The slides write <code>A = K<sup>ᵀ</sup>Q</code> and <code>O = V A′</code>; the paper and every framework write <code>softmax(QK<sup>ᵀ</sup>)V</code>. The difference is purely bookkeeping: the slides stack each vector as a <b>column</b> of the matrix, while PyTorch stacks each token as a <b>row</b> (shape <code>[batch, seq, dim]</code>, because that's how sequences arrive). Transpose one convention and you get the other — <code>O<sup>ᵀ</sup> = A′<sup>ᵀ</sup>V<sup>ᵀ</sup></code>. Worth noticing which convention a source uses before trying to match its shapes, since it also flips whether softmax runs over rows or columns.</p>
   </div>
 
-  <h4>Parallel to train, sequential to generate</h4>
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/attention_block_shapes_wang.png"
+           alt="The attention block drawn with shapes. An input matrix of T rows by D-in columns branches into three paths through weight matrices W-q, W-k and W-v, each D-in by D-out, producing Q, K and V, each T by D-out. Q times K transpose gives A, a T by T matrix. A is divided by the square root of D-out, passed through a row-wise softmax, and multiplied by V to give the output, T by D-out. A boxed formula reads softmax of Q K transpose over root D-out, times V, labelled A prime.">
+    </div>
+    <figcaption><b>The same layer in the row convention, with shapes.</b> Compare against the slide
+    above: <code>T × D<sub>in</sub></code> in, <code>T × D<sub>out</sub></code> out, and the only
+    square matrix anywhere is <code>A</code> at <code>T × T</code> — the one that costs
+    <code>O(n²)</code>. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <h4 id="s-parallel-to-train-sequential-to-generate">Parallel to train, sequential to generate</h4>
   <p>The catch is that parallelism is a <i>training</i> property. At inference an LLM still emits one token at a time, each conditioned on the last — so generation is sequential even though the forward pass is not. That asymmetry is why training scales with hardware and decoding does not, and it is the root of the KV-cache and every batching trick in serving.</p>
 
   <h3 id="s-multi-head-several-kinds-of-relevance-at-once">Multi-head: several kinds of relevance at once</h3>
