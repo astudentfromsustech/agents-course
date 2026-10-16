@@ -1196,6 +1196,126 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
 
   <p>And the choice to <b>add</b> rather than concatenate looks lossy at first — you're summing position into the same coordinates that carry meaning. It works because <code>d_model</code> is large: in a few thousand dimensions there is ample room for position and content to occupy near-orthogonal subspaces, and the projections can read either one back out. Concatenating would have cost extra width for the same effect.</p>
 
+  <h4>Those sinusoids are a Fourier basis</h4>
+
+  <p>Set the two definitions next to each other and the resemblance is not a coincidence:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/pe_fourier_analogy_wang.png"
+           alt="Two formulas on a dark background. Above, f of t is defined piecewise as sine of one over ten thousand to the power two i over D, times t, when d equals 2i; and cosine of the same argument when d equals 2i plus 1. Below, f of x is approximately A-zero plus a sum from n equals one to infinity of A-n sine of two pi n over P times x, plus B-n cosine of two pi n over P times x.">
+    </div>
+    <figcaption><b>The same shape twice.</b> A Fourier series writes a function as sines and cosines
+    at frequencies <code>2πn/P</code>; positional encoding writes a <i>position</i> as sines and
+    cosines at frequencies <code>1/10000<sup>2i/D</sup></code>. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <p>So the <code>d_model</code> coordinates of <code>PE(pos)</code> are not an arbitrary bounded
+  code — they are <b>a frequency decomposition of the position index</b>, one <code>(sin, cos)</code>
+  pair per frequency. The exponent <code>2i/D</code> sweeps those frequencies geometrically, and that
+  is what sets the usable range:</p>
+
+  <details class="more">
+    <summary>Every term written out, and the frequency ladder it spans</summary>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/pe_frequency_ladder_wang.png"
+             alt="At the top left, the positional-encoding matrix P with rows indexed 0, 1, t and D and one row highlighted in orange; at the top right, the piecewise sine and cosine definition of f of t. In the middle, that row written out as a strip of yellow cells: sine and cosine at ten to the four times two times zero over D, then sine and cosine at ten to the four times two times one over D, and so on to cosine at ten to the four times D minus two over D, with each frequency boxed in red dashes. Below, the Fourier series written out term by term with the matching frequencies boxed in red dashes. At the bottom, a red number line with green ticks marking those values, spread from the smallest at the left to ten to the four times two times zero over D at the far right.">
+      </div>
+      <figcaption>One row of <code>P</code>, term by term, against the Fourier series it mirrors. The
+      number line at the bottom is the point: the wavelengths run from about <code>2π</code> up to
+      <code>2π·10000</code>. <b>That constant 10 000 is a choice of longest wavelength</b> — the
+      range of positions the code can address before it starts to repeat itself.
+      <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </details>
+
+  <p>Which lets you read the matrix two ways, and both are useful:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/pe_time_vs_frequency_wang.png"
+           alt="A Fourier series with its sine and cosine terms labelled S-x of i and C-x of i, then rewritten as a vector of those coefficient pairs. Below, the matrix P written with entries S and C indexed by frequency down the rows and by position across the columns; one row is outlined in blue and labelled 时域, the time domain, and one column is outlined in green and labelled 频域, the frequency domain. A green box at the bottom states that in the frequency domain the dimensions of P are mutually orthogonal, channel by channel, and that one over ten thousand to the two i over D gives smaller atomic frequencies over a larger range. A blue box at the top right states that a larger period for f of x allows more tokens to be input at once.">
+    </div>
+    <figcaption><b>A row is a position; a column is a frequency.</b> Read across (时域) and you get
+    one position's signature. Read down (频域) and you get one channel, oscillating at its own rate
+    across every position. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="note">
+    <p><b>Two properties fall out of that reading, and they are the design.</b></p>
+    <ul class="plain">
+      <li><b>频域中，<code>P</code> 的维度互相之间正交.</b> Different frequency channels are mutually
+      orthogonal, so each carries information the others cannot — nothing is wasted on duplication,
+      and the projections can pick out one scale without disturbing another.</li>
+      <li><b>在更大的范围内有更小的“原子”频率.</b> The geometric sweep puts very low frequencies in
+      the code, and a low frequency is a long period. Longer period, more positions addressable
+      before the pattern wraps — which is precisely the knob you turn to extend context length.</li>
+    </ul>
+  </div>
+
+  <details class="more">
+    <summary>And this is where “distance” turns into “angle”</summary>
+    <figure>
+      <div class="slide portrait" style="max-width:430px">
+        <img src="../resources/figures/pe_distance_to_angle_wang.png"
+             alt="A blue box lists two points: a larger period for f of x allows more tokens at once, and the relative relationship changes from a distance into a rotation angle. Below, f of x maps to f of x plus delta, and the pair S-x of i over C-x of i maps to S of x plus delta over C of x plus delta. A rotation matrix M of delta is shown in orange, with entries cosine omega-i delta and sine omega-i delta on the first row and minus sine and cosine on the second, multiplying the vector of sine omega-i x and cosine omega-i x. Two lines of expansion follow, ending in the vector of sine omega-i times x plus delta and cosine omega-i times x plus delta. A unit circle on the right shows a vector rotated by the angle delta.">
+      </div>
+      <figcaption>The same identity derived above, in the lecture's framing: a shift of
+      <code>Δ</code> along the sequence <b>is</b> a rotation by <code>ω<sub>i</sub>Δ</code> in every
+      frequency pair. 从“距离”变成了“旋转角度”. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </details>
+
+  <h4 id="s-what-the-score-does-with-p">What the score actually does with P</h4>
+
+  <p>Earlier this page claimed that adding position makes the score split into four terms. Here is
+  that expansion, and it is where the modern position schemes come from:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/pe_four_terms_wang.png"
+           alt="At the top, A equals X W-query W-key transpose X transpose; below it, A equals the quantity X plus P, times W-query W-key transpose, times the quantity X plus P transposed. That expands into four grid diagrams added together: X W W-transpose X-transpose, X W W-transpose P-transpose, P W W-transpose X-transpose, and P W W-transpose P-transpose, each drawn as a matrix with one query row and one key column highlighted. At the right, R sub q minus k is a column of functions f-1, f-2, f-3 of q minus k. In a red box below, the same four terms are written entry-wise for A at q,k; then the fourth term f of q,k equals P-q W-query W-key-transpose P-k-transpose is rewritten as g of q and q minus k, factored as g-1 of q times g-2 of q minus k, and then with g-1 evaluated at zero, giving v times W-hat-transpose times R q minus k. The final line rewrites A at q,k as the content-content term plus a term in R q minus k, plus a u term, plus a v term.">
+    </div>
+    <figcaption><b><code>A = (X+P)W<sup>q</sup>(W<sup>k</sup>)ᵀ(X+P)ᵀ</code>, multiplied out.</b>
+    Four grids: content–content, content–position, position–content, position–position.
+    <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>term</th><th>what it asks</th></tr></thead>
+    <tbody>
+      <tr><td><code>X<sub>q</sub>WWᵀX<sub>k</sub>ᵀ</code></td><td><b>content–content</b> — the only term that would exist without position. "Is this the token I want?"</td></tr>
+      <tr><td><code>X<sub>q</sub>WWᵀP<sub>k</sub>ᵀ</code></td><td><b>content–position</b> — "given what I am, which slot should I look at?"</td></tr>
+      <tr><td><code>P<sub>q</sub>WWᵀX<sub>k</sub>ᵀ</code></td><td><b>position–content</b> — "given where I am, which token should I look for?"</td></tr>
+      <tr><td><code>P<sub>q</sub>WWᵀP<sub>k</sub>ᵀ</code></td><td><b>position–position</b> — pure geometry, and the only one that can encode "three tokens back"</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The bottom of that figure works on the fourth term. If <code>f(q,k)</code> can be made to depend
+  on <code>q−k</code> alone, the score stops caring about absolute location. Force that, replace the
+  leftover absolute pieces with learned vectors <code>u</code> and <code>v</code>, and you get
+  <b>Transformer-XL's relative encoding</b> — the final line of the figure.</p>
+
+  <div class="note">
+    <p><b>RoPE takes the other route from the same expansion.</b> Instead of adding <code>P</code> and
+    then repairing the four terms, it declines to add anything and rotates <code>q</code> and
+    <code>k</code> themselves, so only <code>q−k</code> can ever survive. In the lecture's complex
+    notation that is one line:</p>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/rope_complex_form_wang.png"
+             alt="A boxed equation: A at q,k equals g of X-q, X-k and q minus k, equals the real part of the quantity X-q times W-query, times the quantity X-k times W-key transposed, times e to the i times the quantity q minus k, times theta.">
+      </div>
+      <figcaption>The same <code>R<sub>n−m</sub></code> identity derived above, written with
+      <code>e<sup>iθ</sup></code> instead of a 2×2 rotation — a rotation in the complex plane is
+      multiplication by a unit modulus. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+    <p>Which explains the hedge two subsections ago. Sinusoidal encoding <i>hopes</i> the projections
+    recover position from a sum of four entangled terms; RoPE removes the hope by making three of
+    them impossible to write down.</p>
+  </div>
+
   <h3 id="s-the-same-layer-other-modalities">The same layer, other modalities</h3>
 
   <p>Nothing in the derivation assumed language. Attention needs only a <b>set of vectors</b> — so anything you can express that way is fair game:</p>
