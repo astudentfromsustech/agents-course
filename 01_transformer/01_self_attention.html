@@ -584,6 +584,30 @@ qⁱ   d_k × 1          128 × 1     <b>= W<sup>q</sup>aⁱ</b>   (128×4096)(4
     With <code>M = I</code> that question cannot even be posed.</p>
   </div>
 
+  <p>Geometrically, then, here is the entire scoring step — and the answer to the question left open
+  above:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/qk_as_angle_wang.png"
+           alt="Above: a matrix Q with rows labelled q1 and q2 multiplied by a matrix K transpose with columns labelled k1 and k2, giving a two-by-two matrix A whose top-right entry is labelled a-1,2. Below: the equation Q row 1 dot K-transpose column 2 equals a-1,2, and beneath it the same quantity written as the magnitude of q1 times the magnitude of k2 times cosine theta. To the right, a pair of axes shows the vector k2 and the vector q1 drawn from the origin with the angle theta between them.">
+    </div>
+    <figcaption><b>Each entry of <code>A</code> is an angle.</b>
+    <code>a₁,₂ = |q₁||k₂|cos θ</code> — large when token 1's query points the same way as token 2's
+    key. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="warn">
+    <p><b>Read that one word carefully: the angle is between <code>q</code> and <code>k</code>, not
+    between the tokens.</b> By the time the cosine is taken, <code>W<sup>q</sup></code> and
+    <code>W<sup>k</sup></code> have already moved both vectors — so "pointing the same way" means
+    whatever those two matrices were trained to make it mean. That is the whole trick, and it is why
+    <a href="#s-why-relevance-has-to-be-learned">relevance need not be similarity</a>: a verb and its
+    subject can be driven to near-zero angle <i>after</i> projection while their raw embeddings sit
+    nearly orthogonal. The dot product supplies the measuring instrument; the projections choose what
+    gets measured.</p>
+  </div>
+
   <h4>Why factor M, instead of just learning it</h4>
 
   <p>Now substitute the projections and the factorisation falls out in one line:</p>
@@ -855,6 +879,19 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
     </div>
     <figcaption><b>The last matmul.</b> Every output at once: <code>O = V A′</code>. Read a single column of <code>A′</code> and you get the weights for one output — the same weighted sum drawn above, just no longer written out by hand. The whole layer is now four matrix multiplies (<code>Q, K, V</code>, then scores, then this), which is the entire reason a GPU can run it at peak throughput. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
+
+  <details class="more">
+    <summary>The same read-out, down to a single number</summary>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/attention_readout_elementwise_wang.png"
+             alt="A softmax row labelled t-hat-1 and t-hat-2 at row t2 multiplies a value matrix whose rows are v1 and v2 and whose column at d-out equals 2 is outlined in red, giving an output matrix whose entry at row t2, column 2 is outlined in red and labelled v-prime 2,2. Below, the equation: the bracket of t-hat-1 times v1 plus t-hat-2 times v2, taken at d-out equals 2, equals v-prime-2 at d-out equals 2, equals v-prime 2,2.">
+      </div>
+      <figcaption>One output element: take position 2's weight row, multiply it into column 2 of
+      <code>V</code>, sum. <b>Every number in the output is a weighted average of one column of
+      <code>V</code></b> — the weights change per position, the columns never mix. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </details>
 
   <p>Put the three together and you get the line every implementation writes:</p>
 
