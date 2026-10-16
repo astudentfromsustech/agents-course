@@ -326,3 +326,8 @@ details.more > summary:hover{text-decoration:underline}
 details.more > summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:3px}
 details.more[open] > summary{margin-bottom:8px}
 details.more > :not(summary){font-size:15px}
+
+/* two figures side by side */
+.duo{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:20px 0; align-items:start}
+.duo figure{margin:0}
+@media(max-width:620px){.duo{grid-template-columns:1fr}}

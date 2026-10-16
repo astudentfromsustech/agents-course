@@ -23,6 +23,7 @@
           <li class="l3"><a href="#s-where-this-sits-a-decoder-only-transformer">Where this sits: a decoder-only transformer</a></li>
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
           <li class="l3"><a href="#s-before-attention-how-a-word-becomes-a-vector">Before attention: how a word becomes a vector</a></li>
+          <li class="l3"><a href="#s-where-the-embedding-matrix-comes-from">Where the embedding matrix comes from: word2vec</a></li>
           <li class="l3"><a href="#s-why-relevance-has-to-be-learned">Why relevance has to be learned</a></li>
           <li class="l3"><a href="#s-the-mechanism-score-weight-read">The mechanism: score, weight, read</a></li>
           <li class="l3"><a href="#s-why-three-projections-and-how-they-relate">Why three projections, and how they relate</a></li>
@@ -304,6 +305,101 @@ after  attention   this token, <b>in this context</b></code></pre>
       </figure>
     </details>
   </div>
+
+  <h3 id="s-where-the-embedding-matrix-comes-from">Where the embedding matrix comes from: word2vec</h3>
+
+  <p>Choosing those axes is itself a training problem. Here is the obvious way to pose it — and it
+  fails, which is the instructive part.</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/w2v_autoencoder_wang.png"
+           alt="Two stacked diagrams inside a dashed orange box labelled 嵌入矩阵, embedding matrix. Above, four one-hot inputs labelled 一键三连 pass rightward through a matrix M to produce four short coloured vectors. Below, the same coloured vectors pass leftward through a matrix M inverse back to the one-hot inputs. Between them a grey box reads M times M inverse equals I. Red text on the right reads 训练出来是M的伪逆矩阵 而不是token的语义关系 — what gets trained is M's pseudo-inverse, not the semantic relations between tokens.">
+    </div>
+    <figcaption><b>训练出来是 <i>M</i> 的伪逆矩阵，而不是 token 的语义关系.</b> Squeeze a one-hot through
+    <code>M</code>, expand it back, and ask for the original: the second matrix just learns
+    <code>M</code>'s pseudo-inverse. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <p>The reason is the geometry from two figures ago. One-hot vectors are mutually orthogonal and
+  equidistant, so <b>the only fact present in the data is identity</b> — and reconstruction asks for
+  exactly that fact back. There is no shared structure for the bottleneck to exploit, so it settles
+  on an arbitrary reversible code. <a href="00_representation.html#s-lowering-dimension-making-the-answer-reusable">Compression
+  only buys meaning when the things being compressed have something in common</a>; isolated tokens
+  have nothing.</p>
+
+  <p><b>word2vec's move is to change the target.</b> Stop asking the network to reproduce the token.
+  Ask it to predict the token's <i>company</i> — which is a fact about the corpus that identity alone
+  cannot answer. Two directions, same idea:</p>
+
+  <div class="duo">
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/w2v_cbow_wang.png"
+             alt="Four green boxes labelled word i-2, word i-1, word i+1 and word i+2 feed arrows into a tall blue bar marked with a plus sign, which outputs to a single orange box labelled word i. A dashed white box marks the gap at position i. The label reads CBOW. Below, a small vector diagram shows four solid green arrows radiating from a point and one dashed orange arrow as their resultant.">
+      </div>
+      <figcaption><b>CBOW</b> — sum the neighbours, predict the hole. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/w2v_skipgram_wang.png"
+             alt="One orange box labelled word i feeds an arrow into a tall blue bar, which outputs arrows to four green boxes labelled word i-2, word i-1, word i+1 and word i+2, with a dashed white box at position i. The label reads skip-gram. Below, a small vector diagram shows one solid orange arrow from a point and four dashed green arrows radiating from it.">
+      </div>
+      <figcaption><b>skip-gram</b> — one word, predict each neighbour. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </div>
+
+  <p>Look at the little vector diagrams under each. CBOW draws the target as the <i>resultant</i> of
+  its context vectors — which is the mechanism behind your dictionary analogy, made literal:</p>
+
+  <div class="note">
+    <p><b>word2vec 更像是编词典.</b> A dictionary explains a target word <i>using other words</i>.
+    word2vec's latent space does the same thing with addition — <b>用其它的词向量去合成目标词向量</b>.
+    That is what the blue <code>+</code> in CBOW is.</p>
+  </div>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/w2v_architecture_wang.png"
+           alt="A network diagram. On the left, C input blocks labelled x-1k, x-2k through x-Ck, each a V-dimensional one-hot column, together forming a C times V dimensional input layer. Each connects through the same matrix W of size V by N to a single narrow hidden layer h-i of N dimensions. The hidden layer then connects through a second matrix W-prime of size N by V to a V-dimensional output layer y-j.">
+    </div>
+    <figcaption><b>One shared <code>W</code>, one narrow <code>h</code>, no nonlinearity.</b> The
+    <code>V × N</code> matrix on the left is the embedding; <code>W′</code> and the output layer are
+    scaffolding, discarded after training. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="warn">
+    <p><b>The task is a pretext; the geometry is the product.</b> Take 这是一个 ___ 苹果. The blank
+    accepts 红, 绿, 便宜 — all reasonable, so the model cannot be right. That is not a defect. The
+    window is deliberately small, and <b>the goal was never cloze accuracy</b>: it is that after
+    training, 红 · 绿 · 便宜 end up <i>near each other</i> in the latent space, because they were
+    fitted against the same blanks. The prediction gets thrown away with <code>W′</code>. The
+    arrangement is what you keep.</p>
+  </div>
+
+  <p>Two consequences worth carrying into the rest of this chapter.</p>
+
+  <div class="tw" style="margin:14px 0"><table>
+    <thead><tr><th>What word2vec gives you</th><th>What it cannot give you</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Relations between <b>individual tokens</b>, averaged over the whole corpus — the initial
+        understanding of meaning, nothing more.</td>
+        <td><b>One vector per token</b>, so every sense shares it. 词典的一个词会有多个意思; the entry
+        is the union, and the sentence is not consulted.</td>
+      </tr>
+      <tr>
+        <td><b>Objective</b> meaning: the statistics of what people actually wrote, independent of any
+        one author's intent.</td>
+        <td><b>Subjective</b> meaning: that appears only when an author composes <i>these</i> words in
+        <i>this</i> order — a property of the sentence, not of the dictionary.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <p>The right-hand column is the job description for everything that follows. word2vec compiles the
+  dictionary; <b>self-attention reads the sentence</b> — it is the layer that takes those
+  author-independent vectors and lets a particular context bend them.</p>
 
   <figure>
     <div class="slide">
