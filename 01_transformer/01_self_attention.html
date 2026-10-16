@@ -1109,6 +1109,57 @@ two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
     smooth in position. Sinusoids are all three.</p>
   </div>
 
+  <h4>Said plainly: it is a map out of ℕ</h4>
+
+  <p>Strip the sinusoids away and absolute positional encoding is one move, with a type signature
+  worth writing down:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/pe_from_naturals_wang.png"
+           alt="A grey three-by-three matrix with rows labelled t0, t1 and t2, a plus sign, and a purple three-by-three matrix with rows labelled b0, b1 and b2. Below, a blue number line marked with three points t0, t1 and t2 and labelled with the symbol for the natural numbers; a thick yellow arrow runs from that line up to the purple matrix.">
+    </div>
+    <figcaption><b>把位置下标投射到一个与词向量维度相同的连续空间.</b> The index is a point on
+    <code>ℕ</code>; <code>b<sub>i</sub></code> is a <code>d_model</code>-wide row. Same width as the
+    token matrix, so the two just add. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+<pre><code>PE : ℕ ⟶ ℝ^d_model      <span class="cm"># one dimension in, thousands out</span></code></pre>
+
+  <p>Which is <a href="00_representation.html#s-raising-dimension-making-the-problem-easy">the same
+  trade as part 0</a>, applied to position instead of to data: spend dimensions, buy a space where
+  the thing you want is easy to express. A single integer has no room for "three tokens back" to be
+  a <i>direction</i>; <code>d_model</code> of them do.</p>
+
+  <p>That also sharpens the earlier objection. Appending the raw index is not a different idea — it
+  is this map with <code>d = 1</code>, which is why all three of its failures are symptoms of the
+  same thing: the codomain was too small.</p>
+
+  <h4>Why add it, and not multiply</h4>
+
+  <p>Having built <code>b<sub>i</sub></code> the right width, there are two obvious ways to put it in:</p>
+
+  <figure>
+    <div class="slide portrait" style="max-width:360px">
+      <img src="../resources/figures/pe_multiply_or_add_wang.png"
+           alt="A grey three-by-three token matrix with rows labelled t0, t1 and t2 sits in the centre. A yellow arrow points up from it to a row showing the same grey matrix, an element-wise product symbol, and a green matrix labelled P-w. A second yellow arrow points down to a row showing the grey matrix, a plus sign, and a purple matrix labelled P-b.">
+    </div>
+    <figcaption>Element-wise product with <code>P<sub>w</sub></code>, or sum with
+    <code>P<sub>b</sub></code>. The transformer takes the lower road. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="note">
+    <p><b>Addition is the only one of the two that survives the projection.</b> Because
+    <code>W<sup>q</sup></code> is linear, <code>W<sup>q</sup>(a + e) = W<sup>q</sup>a +
+    W<sup>q</sup>e</code> — content and position pass through as separate summands, and the score
+    expands into four terms, one of them a pure position–position term carrying the offset. That is
+    what the next subsection's rotation argument needs in order to reach the score at all.</p>
+    <p>A product does not split: <code>W<sup>q</sup>(a ⊙ p)</code> cannot be separated into a content
+    part and a position part. Worse, <code>⊙</code> <i>gates</i> — a small entry in
+    <code>P<sub>w</sub></code> suppresses that feature at that position no matter which token is
+    sitting there. Position would be scaling meaning rather than offsetting it.</p>
+  </div>
+
   <h4>Why sinusoids, and not any other bounded code</h4>
 
   <p>"Continuous binary counter" explains why the pattern never repeats, but not why <i>these</i>
