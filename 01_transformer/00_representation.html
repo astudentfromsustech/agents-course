@@ -262,6 +262,19 @@ and why a network spends one half of itself <strong>raising</strong> dimension a
     <figcaption><b>Low-level parts get reused.</b> The same stroke fragments that build an <code>8</code> also build a <code>9</code>, a <code>3</code>, a <code>5</code>. That reuse is what a narrow layer is forcing. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
   </figure>
 
+  <details class="more">
+    <summary>The same hierarchy on real photographs</summary>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/feature_hierarchy_objects_wang.png"
+             alt="Four columns of learned features, headed Faces, Cars, Elephants and Chairs. Each column has three rows of grey-scale image patches connected by upward red arrows. The bottom row, identical across all four columns, shows small oriented edge and blob filters. The middle row shows parts specific to each category: eyes, noses and mouths for faces, wheels and windows for cars, legs and trunks for elephants, and seat backs and legs for chairs. The top row shows whole objects: complete faces, whole cars, whole elephants and whole chairs.">
+      </div>
+      <figcaption><b>The bottom row is identical in all four columns.</b> Edges are edges, whatever
+      you are looking at; parts and whole objects are what diverge. The classic visualisation of
+      this, from Lee et al.'s convolutional deep belief network work (2009). <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </details>
+
   <p>Watch it on a different digit — the same fragments, reassembled:</p>
 
   <figure>

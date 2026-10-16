@@ -1021,8 +1021,21 @@ two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
     <figcaption><b><code>W<sup>O</sup></code> puts the heads back together.</b> Stack the per-head results and project once: <code>b<sup>i</sup> = W<sup>O</sup>[b<sup>i,1</sup>; b<sup>i,2</sup>]</code>. This is a fourth learned matrix, and it isn't bookkeeping — it weighs how much each head contributes and lets each head write into its own subspace of the residual stream. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, National Taiwan University.</span></figcaption>
   </figure>
 
+  <p><b>Where <code>W<sup>O</sup></code>'s rows come from.</b> "Route them separately" is literal —
+  expand one output entry and the sum falls into per-head groups:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/multihead_concat_proj_wang.png"
+           alt="On the left, an input matrix X fans out into three grey boxes each labelled Attention and each holding its own stacked W-q, W-k and W-v matrices and a V. Each produces an output Z with superscript zero, one and two. The three are concatenated into a single wide matrix Z, which is multiplied by a tall matrix W to give the small output matrix Y. On the right, the entry Z row q dot W column k is written out as nine terms: three terms using Z from head zero times W rows one to three, three using Z from head one times W rows four to six, and three using Z from head two times W rows seven to nine.">
+    </div>
+    <figcaption><b>Concatenate, then one projection.</b> Head <i>h</i> owns a contiguous block of
+    <code>W</code>'s rows and touches no other — so the heads stay separable all the way to the
+    output, and <code>W</code> decides how much of each to admit. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
   <div class="note">
-    <p><b>Heads split the width, they don't add to it.</b> The intuitive worry is that 32 heads cost 32× — they don't. With <code>d_model = 4096</code> and 32 heads, each head works in <code>d_k = 128</code>, and <code>32 × 128 = 4096</code>: the same total dimension, <b>partitioned</b> rather than duplicated. Parameters and FLOPs are essentially unchanged from one wide head. What you get for free is <b>independence</b> — 32 separate score matrices that can specialize, instead of one that must compromise. That is close to the best trade in the architecture, and it's why every model uses many heads.</p>
+        <p><b>Heads split the width, they don't add to it.</b> The intuitive worry is that 32 heads cost 32× — they don't. With <code>d_model = 4096</code> and 32 heads, each head works in <code>d_k = 128</code>, and <code>32 × 128 = 4096</code>: the same total dimension, <b>partitioned</b> rather than duplicated. Parameters and FLOPs are essentially unchanged from one wide head. What you get for free is <b>independence</b> — 32 separate score matrices that can specialize, instead of one that must compromise. That is close to the best trade in the architecture, and it's why every model uses many heads.</p>
   </div>
 
   <h3 id="s-what-the-attention-scores-are">What the attention scores are</h3>
@@ -1375,6 +1388,60 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
     </div>
     <figcaption><b>CNN is a strict subset.</b> Give each head an attention map that fixes on one offset from the query pixel — head 1 always looks up-left, head 2 always up, and so on — and the heads together reproduce a convolutional kernel exactly. So a multi-head attention layer with enough heads can <i>express</i> any convolution, while no convolution can express general attention. <span style="opacity:.7">Cordonnier et al., <a target="_blank" rel="noopener noreferrer" href="https://arxiv.org/abs/1911.03584">arXiv:1911.03584</a>. Slide from Hung-yi Lee's Machine Learning course, NTU.</span></figcaption>
   </figure>
+
+  <p>That slide asserts it. The construction behind it is worth seeing, because it is short. Start by
+  throwing away everything a head knows about content — keep only the relative-position term from
+  <a href="#s-what-the-score-does-with-p">the four-term expansion</a>:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/head_positional_only_wang.png"
+           alt="A four-term expression for A at q,k is shown with its first three terms greyed out, leaving the fourth term v times W-key-hat transposed times R q-minus-k transposed in colour. Below it, a reduced line reads A at q,k equals v superscript h, dot I, dot R q minus k transposed.">
+    </div>
+    <figcaption>A head with no content terms at all: <code>A<sub>q,k</sub> = v<sup>(h)</sup> · I ·
+    R<sub>q−k</sub>ᵀ</code>. Its score depends on the offset and nothing else. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <p>Now choose the relative encoding and that vector to complete a square:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/head_offset_square_wang.png"
+           alt="On the left, a one-dimensional derivation: v superscript h is defined as minus alpha times the pair one and minus two Delta; R sub delta is defined as delta squared and delta, where delta is q minus k. Their product expands, a square is completed, and the result is minus alpha times the quantity delta minus Delta, squared, minus Delta squared. Below, a six by six attention matrix with a red-outlined band running down the diagonal and arrows offset by delta, annotated Delta equals minus two and delta equals q minus k equals minus two. On the right, the same derivation in two dimensions with delta a vector of delta-one and delta-two, R defined as the squared norm of delta together with its two components, ending in minus alpha times the squared norm of delta minus Delta, minus the squared norm of Delta. Below it a cube of voxels shows a query cell q and a key cell k joined by an arrow labelled delta.">
+    </div>
+    <figcaption><b>The square is the whole trick.</b> With <code>R<sub>δ</sub> = (δ², δ)</code> and
+    <code>v<sup>(h)</sup> = −α<sup>(h)</sup>(1, −2Δ<sup>(h)</sup>)</code>, the score becomes
+    <code>−α((δ − Δ<sup>(h)</sup>)² − Δ<sup>(h)²</sup>)</code> — maximal exactly at
+    <code>δ = Δ<sup>(h)</sup></code>, and falling off quadratically either side. Raise
+    <code>α</code> and the softmax sharpens to a single cell. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="note">
+    <p><b>So one head can be pinned to one offset.</b> Read the attention matrix underneath: with
+    <code>Δ = −2</code> the mass sits on a single diagonal band, two positions back, at every query.
+    That is a shift. In two dimensions <code>R<sub>δ⃗</sub> = (‖δ⃗‖², δ₁, δ₂)</code> gives the same
+    result for a pixel offset <code>Δ⃗<sup>(h)</sup></code> — one head, one tap of a kernel.</p>
+  </div>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/mhsa_as_convolution_wang.png"
+           alt="A figure titled Multi-Head Self-Attention Layer. On the left an input volume X of height H, width W and depth D-in, marked with a key pixel at position k and a query pixel at position q. In the centre, several attention maps for pixel q, labelled A superscript one, A superscript two down to A superscript N-h, each a heatmap concentrated at its own offset Delta. Each is multiplied by a green filter matrix W-val with its own superscript, of size D-in by D-h. The results are concatenated into a tall matrix of height N-h times D-h and multiplied by W-out to give MHSA of X, an output volume of height H, width W and depth D-out.">
+    </div>
+    <figcaption><b>N<sub>h</sub> heads, N<sub>h</sub> kernel taps.</b> Each head's map is pinned to
+    one offset, its <code>W<sub>val</sub><sup>(h)</sup></code> is that tap's filter, and
+    concatenate-then-<code>W<sub>out</sub></code> is the sum over taps. Which is a convolution.
+    <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="warn">
+    <p><b>That is what "strict subset" means, precisely.</b> Not "attention is a bit like
+    convolution" — a multi-head self-attention layer with relative position encoding and
+    <code>N<sub>h</sub></code> heads <i>can represent</i> any convolutional layer whose kernel has
+    <code>N<sub>h</sub></code> taps. The heads supply the kernel positions, the value projections
+    supply the weights. And note which ingredient carries it: <b>relative</b> position encoding. The
+    construction needs <code>q − k</code>; absolute encodings cannot state "two back" as one fact.</p>
+  </div>
 
   <p>Being the more flexible model is not automatically an advantage, and the data settles it:</p>
 

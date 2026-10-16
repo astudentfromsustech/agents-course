@@ -579,6 +579,17 @@
   </div>
 
   <h3 id="s-the-steps-in-order">The steps, in order</h3>
+
+  <p>Four of those steps are blocks you can point at. Reading order, top-left to bottom-right:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/architecture_block_tour_wang.png"
+           alt="Four copies of the transformer architecture diagram in a two-by-two grid, each with a different component outlined in red. Top left: the word Masked on the decoder's masked multi-head attention block. Top right: all four Add and Norm blocks, two in the encoder and two in the decoder. Bottom left: the Feed Forward block in the encoder and the one in the decoder. Bottom right: the Linear and Softmax blocks at the top of the decoder, just below Output Probabilities.">
+    </div>
+    <figcaption><b>The causal mask · Add &amp; Norm · Feed Forward · Linear + Softmax.</b> Everything
+    else in the diagram is wiring between them. <span style="opacity:.7">Screenshots from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
   <ol class="steps">
     <li>
       <span class="st">Tokenize</span>
