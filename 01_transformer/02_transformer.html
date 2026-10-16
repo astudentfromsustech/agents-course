@@ -377,6 +377,69 @@
     <figcaption><b>The encoder side never changes.</b> Compare with the previous figure: <code>k¹…k³</code> and <code>v¹…v³</code> are identical; only the query moved. The input is encoded <b>once</b> and then read repeatedly, one query per generated token — which is why decoding cost grows with the output length, not with a re-reading of the input. <span style="opacity:.7">Slide from Hung-yi Lee's Machine Learning course, NTU.</span></figcaption>
   </figure>
 
+  <p>Put the two blocks side by side and the <i>only</i> difference is where the arrows start —
+  which the shapes make unmissable:</p>
+
+  <div class="duo">
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/selfattn_block_wang.png"
+             alt="A block diagram titled self-Attention. One input matrix of T rows by D-in columns branches three ways through W-q, W-k and W-v, each D-in by D-out, producing Q, K and V, each T by D-out. Q times K transpose gives A, a T by T matrix, which is divided by the square root of D-out, softmaxed and multiplied by V, giving an output of T by D-out.">
+      </div>
+      <figcaption><b>self-attention</b> — one source. <code>A</code> is <code>T × T</code>: square.
+      <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/crossattn_block_wang.png"
+             alt="A block diagram titled cross-Attention. One input of T-1 rows by D-in-prime columns goes through W-q alone to give Q, of size T-1 by D-out. A second, separate input of T-2 rows by D-in columns goes through W-k and W-v to give K and V, each T-2 by D-out. Q times K transpose gives A, of size T-1 by T-2, which is scaled, softmaxed and multiplied by V, giving an output of T-1 by D-out.">
+      </div>
+      <figcaption><b>cross-attention</b> — two sources. <code>A</code> is
+      <code>T₁ × T₂</code>: rectangular. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </div>
+
+  <p><b>Read the output shape.</b> It is <code>T₁ × D<sub>out</sub></code> in both — one vector per
+  <i>query</i> position. So cross-attention leaves the decoder's length alone and changes only what
+  each of its positions contains. A 4-token Chinese input can inform a 7-token English output
+  without either side being padded to match: that rectangular <code>A</code> is how a translation
+  model survives the two sequences having different lengths.</p>
+
+  <div class="note">
+    <p><b>The lecturer's analogy, which is worth keeping.</b> Self-attention is
+    <b>闷头自学</b> — studying head-down, alone: every idea has to be assembled out of the material
+    already in front of you. Cross-attention is <b>手边有一份参考资料</b>, a reference open beside
+    you. It skips the work of establishing what things mean, because the reference supplies that —
+    but it is a passive way to learn, good for <i>expressing</i> meaning rather than forming it. You
+    can memorise the answer and still fail when the question is reworded.</p>
+    <p><b>And then the turn that makes the analogy fair:</b> if the job <i>is</i> translation, that
+    is not a weakness. Consulting the source on every output token is exactly the behaviour you
+    want — not a crutch but a <b>calibration</b>. The analogy is a caution about what cross-attention
+    is for, not a verdict against it.</p>
+  </div>
+
+  <p>One structural detail the unrolled pictures above hide: the decoder is a <i>stack</i>, and the
+  consultation happens at every floor of it.</p>
+
+  <figure>
+    <div class="slide portrait" style="max-width:360px">
+      <img src="../resources/figures/crossattn_every_layer_wang.png"
+           alt="Two dashed boxes side by side. On the left, labelled Encoder, four green blocks stacked with blue arrows rising through them. On the right, labelled Decoder, three orange blocks stacked with blue arrows rising through them. A red line leaves the top of the encoder stack and branches into three red arrows, one entering each of the three decoder blocks.">
+    </div>
+    <figcaption><b>One encoder output, consumed by every decoder layer.</b> The red line leaves the
+    <i>top</i> of the encoder — not each floor matched to its own — and feeds all of them.
+    <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <div class="warn">
+    <p><b>Two things to take from that picture, and both get misremembered.</b> First, the encoder
+    stack runs to completion <i>before</i> the decoder starts; layer <i>n</i> of the decoder does not
+    talk to layer <i>n</i> of the encoder. There is one final encoder output and every decoder layer
+    reads that same thing. Second, it is read <b>N times, not once</b> — as the lecturer puts it,
+    每做一次注意力计算，都需要校准一次: every attention computation gets its own recalibration against
+    the source. A decoder layer refines its guess, re-consults the input, refines again.</p>
+  </div>
+
   <p>And because those weights are a distribution over input positions, you can simply plot them:</p>
 
   <figure>

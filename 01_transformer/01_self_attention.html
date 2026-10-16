@@ -632,6 +632,57 @@ qⁱ · kʲ  =  (W<sup>q</sup>aⁱ)ᵀ (W<sup>k</sup>aʲ)  =  aⁱᵀ (W<sup>q</
   compute each token's query and key once, and every pairwise score is a single matrix multiply. Keep
   <code>M</code> whole and you would factor it yourself to get that.</p>
 
+  <h4>And why not <i>one</i> matrix?</h4>
+
+  <p>Two different objections hide behind that question. The table above answers the first — <i>why
+  not learn <code>M</code> whole</i> — on parameters, rank and cost. The algebra there is not in
+  dispute:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/qk_absorb_into_one_wang.png"
+           alt="Two equations on a dark background. The first reads A equals X times W-A. The second reads A equals X times W-q times the quantity X times W-k transposed, which equals X times the bracketed product W-q times W-k transposed times X transposed, which equals X times W-A times X transposed.">
+    </div>
+    <figcaption><code>W<sup>q</sup>(W<sup>k</sup>)ᵀ</code> does collapse into a single
+    <code>W<sub>A</sub></code>. Factoring buys cheapness and a rank cap — not expressiveness.
+    <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <p>The second objection is sharper: why not <b>tie</b> them — one matrix serving both sides,
+  <code>W<sup>q</sup> = W<sup>k</sup></code>? That is not a question of cost. It changes what can be
+  expressed at all, and the reason is one word long:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/qk_tied_symmetric_wang.png"
+           alt="Equations on a dark background. At the top, A equals X times the bracketed product W-q times W-q transposed, times X transposed. Below, highlighted in a black box, B is defined as one half of the quantity W-q times W-k transposed plus W-k times W-q transposed. A downward arrow leads to a final line reading X times the bracketed W-q times W-k transposed times X transposed equals X times B times X transposed.">
+    </div>
+    <figcaption>Tie them and <code>M = W<sup>q</sup>(W<sup>q</sup>)ᵀ</code> — <b>symmetric</b>,
+    whatever <code>W<sup>q</sup></code> happens to be. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <p>A symmetric <code>M</code> forces a symmetric score matrix. With tokens as rows,
+  <code>A = XMX<sup>ᵀ</sup></code>:</p>
+
+<pre><code>A<sub>ij</sub> = x<sub>i</sub> M x<sub>j</sub>ᵀ      <span class="cm"># a scalar, so it equals its own transpose</span>
+A<sub>ji</sub> = x<sub>j</sub> M x<sub>i</sub>ᵀ = x<sub>i</sub> Mᵀ x<sub>j</sub>ᵀ
+
+<span class="cm"># M = Mᵀ  ⟹  A_ij = A_ji  ⟹  A = Aᵀ</span></code></pre>
+
+  <div class="warn">
+    <p><b>Symmetric scores make relevance mutual — and relevance is not mutual.</b>
+    <code>A<sub>ij</sub> = A<sub>ji</sub></code> says that however much <i>sat</i> ought to read
+    <i>cat</i>, <i>cat</i> must read <i>sat</i> exactly as much. A verb seeking its subject would
+    compel that subject to seek the verb back, by the same amount, in every sentence. The
+    <b>“query = key”</b> row of the tying table above says this in words; here it is as algebra.
+    <b>What the second matrix buys is the <i>antisymmetric</i> half of <code>M</code></b> — precisely
+    the half a single shared matrix cannot produce.</p>
+    <p>The <code>B</code> in that figure is the symmetric half, <code>½(M + Mᵀ)</code>. It is worth
+    being exact about what it captures: <code>XBX<sup>ᵀ</sup> = ½(A + A<sup>ᵀ</sup>)</code>, the
+    symmetric part of the scores — equal to <code>A</code> on the diagonal, and <i>not</i> equal to
+    it anywhere else. That gap off the diagonal is the whole value of keeping two matrices.</p>
+  </div>
+
   <h4>How anyone came up with it</h4>
 
   <p>It was not invented from nothing — it arrived by two small steps, each fixing the step before:</p>
