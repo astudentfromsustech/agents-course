@@ -99,8 +99,19 @@ and why a network spends one half of itself <strong>raising</strong> dimension a
 <section>
   <h3 id="s-raising-dimension-making-the-problem-easy">Raising dimension: making the problem easy</h3>
 
-  <p>Start with the smallest useful network — two inputs, a wide hidden layer, one output. Its first
-  act is to turn a 2-dimensional point into a 10-dimensional one, and in matrix form that is the entire
+  <p>The vocabulary first, since the rest of the page leans on it:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/mlp_anatomy_wang.png"
+           alt="A fully connected network in three labelled blocks: a red 输入层 input layer of two neurons on the left, a tall blue 隐藏层 hidden layer of ten neurons in the middle, and an orange 输出层 output layer of four neurons on the right. Vertical text between them reads 让模型更复杂 — make the model more complex.">
+    </div>
+    <figcaption><b>输入层 · 隐藏层 · 输出层.</b> Input, hidden, output. Everything interesting happens in the middle — and the first question is why the middle is <i>wider</i> than the input at all. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+
+  <p>Start with the smallest useful case — two inputs, a wide hidden layer, one output. Its first act is
+  to turn a 2-dimensional point into a 10-dimensional one, and in matrix form that is the entire
   operation:</p>
   <figure>
     <div class="slide">
@@ -120,6 +131,17 @@ and why a network spends one half of itself <strong>raising</strong> dimension a
     </div>
     <figcaption>Orange and green, interleaved. In this view no straight cut separates them. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
   </figure>
+
+  <details class="more">
+    <summary>Another frame of the same lift</summary>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/dimup_scatter_a_wang.png"
+             alt="The same small network beside a three-dimensional scatter of orange and green points, drawn at a different moment of the animation and from a slightly different viewing angle, with the weight matrix that performs the lift shown below it. The subtitle again reads 但是我把它们全部升维.">
+      </div>
+      <figcaption>Mid-lift, with the matrix doing it on screen. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </details>
 
   <figure>
     <div class="slide">
@@ -151,9 +173,47 @@ and why a network spends one half of itself <strong>raising</strong> dimension a
     <figcaption><b>Depth up, width down.</b> The network is becoming more expressive and more compact at the same time, which only makes sense if the narrow layers hold something better than the raw input. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
   </figure>
 
-  <p>They do, and the clearest way to see it is a task where we can name what the middle layer ought
-  to contain. Reading an expression from a photograph: thousands of raw pixels in, eight emotions out —
-  and in between, a handful of <b>features</b>:</p>
+  <p>They do — and the lecture makes that case in four steps, worth following in order because each
+  one takes away something you were allowed to assume.</p>
+
+  <p><b>Step 1 — features you picked yourself.</b> Should a video be recommended? Feed in the numbers
+  you already trust:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/features_recommend_wang.png"
+           alt="A single-layer network. Eight red input neurons labelled with engagement metrics — coins given, favourites, shares, completion rate, danmaku count, comment count and two facial-action entries — all converging on one output neuron labelled 是否值得推荐, whether it is worth recommending.">
+    </div>
+    <figcaption>Eight hand-picked numbers, one decision — and <b>no hidden layer needed</b>, because a human already did the feature extraction by choosing what to measure. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+
+  <p><b>Step 2 — same idea, harder output.</b> Eight facial muscle movements decide among eight
+  emotions:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/features_face_emotions_wang.png"
+           alt="A two-layer network. On the left, boxed in yellow and labelled 特征 features, eight red neurons named for facial movements: forehead, eyebrow, eye, nose, cheek, lip, head and eyeball movement. On the right, eight orange output neurons for emotions: confusion, anger, surprise, happiness, neutral, sadness, fear and realisation, fully connected.">
+    </div>
+    <figcaption>Still hand-chosen — but now the features are plainly <i>intermediate</i>. Nobody wants eyebrow position for its own sake; it earns its place because several emotions depend on it. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+
+  <p><b>Step 3 — the problem.</b> You never actually receive muscle movements. You receive a
+  photograph:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/features_face_photo_wang.png"
+           alt="The same features-to-emotions network, now with a grayscale photograph of a man's face placed to its left, showing that the real input is an image rather than the named features.">
+    </div>
+    <figcaption>The features are what you <i>want</i>; pixels are what you <i>have</i>. Writing that bridge by hand is the job that defeated computer vision for decades. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+
+  <p><b>Step 4 — let the network find them.</b> Put the pixels in and make the middle layer
+  narrow:</p>
   <figure>
     <div class="slide">
       <img src="../resources/figures/features_face_3500_wang.png"
@@ -183,12 +243,33 @@ and why a network spends one half of itself <strong>raising</strong> dimension a
     <figcaption>Hidden neurons as detectors. The first hidden layer has learned stroke fragments; the second assembles them into the two loops that make an <code>8</code>. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
   </figure>
 
+  <details class="more">
+    <summary>An earlier frame — before the stroke detectors are drawn</summary>
+    <figure>
+      <div class="slide">
+        <img src="../resources/figures/mnist_features_a_wang.png"
+             alt="The same handwritten 8 and 784-input network at an earlier point in the animation: only two small image patches are drawn, both in the second hidden layer and both showing closed loop shapes, with yellow lines running from them to the output neuron for 8.">
+      </div>
+      <figcaption>Two loop detectors, nothing else — the two halves of an <code>8</code>. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+    </figure>
+  </details>
+
   <figure>
     <div class="slide">
       <img src="../resources/figures/mnist_reuse_wang.png"
            alt="The same digit-8 network, with many stroke-fragment patches visible in the first hidden layer and yellow connections fanning from them to loop detectors in the second layer. A subtitle reads 底层的特征会被更容易的复用 — low-level features are more easily reused.">
     </div>
     <figcaption><b>Low-level parts get reused.</b> The same stroke fragments that build an <code>8</code> also build a <code>9</code>, a <code>3</code>, a <code>5</code>. That reuse is what a narrow layer is forcing. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
+  </figure>
+
+  <p>Watch it on a different digit — the same fragments, reassembled:</p>
+
+  <figure>
+    <div class="slide">
+      <img src="../resources/figures/mnist_reuse_nine_wang.png"
+           alt="A handwritten digit drawn as coloured segments: a diagonal white and red stroke above a loop built from blue, green and orange pieces, beside the same network with yellow connections running from first-layer stroke detectors through second-layer shapes to the output. A subtitle reads 就可以和8进行复用 — it can be reused with 8.">
+    </div>
+    <figcaption><b>就可以和8进行复用.</b> The loop detector trained on <code>8</code> fires here too. This digit was not learned from scratch. <span style="opacity:.7">Screenshot from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili).</span></figcaption>
   </figure>
 
   <figure>
