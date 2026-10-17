@@ -12,3 +12,6 @@ research/logs/
 practice/*/loss.png
 practice/*/heads.png
 practice/**/__pycache__/
+practice/*/attention_maps.png
+practice/**/mnist.npz
+practice/**/data/

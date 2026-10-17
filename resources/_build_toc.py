@@ -43,6 +43,7 @@ PRACTICE = [
     ("p0", "attention, step by step", f"{COLAB}/practice/p0_attention/walkthrough.ipynb", "nb"),
     ("p0", "write it yourself",       f"{GH}/practice/p0_attention/attention_lab.py",      "py"),
     ("p1", "heads learn a circuit",   f"{COLAB}/practice/p1_induction_heads/induction.ipynb", "nb"),
+    ("p2", "a ViT reads digits",      f"{COLAB}/practice/p2_vit_mnist/vit_mnist.ipynb",    "nb"),
     ("", "run it on your own Mac",     f"{GH}/practice/RUNNING.md",                          "doc"),
 ]
 

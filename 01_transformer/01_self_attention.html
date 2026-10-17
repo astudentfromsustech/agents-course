@@ -61,6 +61,7 @@
       <li class="nb"><a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p0_attention/walkthrough.ipynb"><i>p0</i><span>attention, step by step</span></a></li>
       <li class="py"><a target="_blank" rel="noopener noreferrer" href="https://github.com/astudentfromsustech/agents-course/blob/main/practice/p0_attention/attention_lab.py"><i>p0</i><span>write it yourself</span></a></li>
       <li class="nb"><a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p1_induction_heads/induction.ipynb"><i>p1</i><span>heads learn a circuit</span></a></li>
+      <li class="nb"><a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p2_vit_mnist/vit_mnist.ipynb"><i>p2</i><span>a ViT reads digits</span></a></li>
       <li class="doc"><a target="_blank" rel="noopener noreferrer" href="https://github.com/astudentfromsustech/agents-course/blob/main/practice/RUNNING.md"><i></i><span>run it on your own Mac</span></a></li>
     </ul>
   </nav>
@@ -1122,6 +1123,13 @@ two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
     smooth in position. Sinusoids are all three.</p>
   </div>
 
+  <div class="tryit">
+    <p><b>Measure it.</b> <a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p2_vit_mnist/vit_mnist.ipynb">practice p2</a> trains two identical Vision
+    Transformers on MNIST, one with the positional encoding switched off, then shuffles the image
+    patches at test time. With position: 95.51 % → 84.57 %. Without: 92.28 % → 92.28 %, a delta of
+    <b>exactly +0.00</b> — the layer cannot see the shuffle because it only ever received a set.</p>
+  </div>
+
   <h4>Said plainly: it is a map out of ℕ</h4>
 
   <p>Strip the sinusoids away and absolute positional encoding is one move, with a type signature
@@ -1444,6 +1452,14 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
   </div>
 
   <p>Being the more flexible model is not automatically an advantage, and the data settles it:</p>
+
+  <div class="tryit">
+    <p><b>Reproduce the shape of it on a laptop.</b> <a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p2_vit_mnist/vit_mnist.ipynb">practice p2</a> runs a
+    small CNN and a ViT at the same budget over a growing slice of MNIST. The gap closes
+    monotonically — <code>−19.4</code> points at N = 1 000, <code>−2.9</code> at N = 60 000 — without
+    ever crossing, because all of MNIST sits inside the small-data regime. The <i>slope</i> is the
+    argument; the crossover needs the 100 M images this chart has.</p>
+  </div>
 
   <figure>
     <div class="slide">
