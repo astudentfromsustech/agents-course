@@ -158,10 +158,14 @@ def show_data(d, n=8, path="data_and_patches.png"):
 
     ax2 = fig.add_subplot(gs[1, 2:])                         # --- what it means
     ax2.axis("off")
-    ax2.text(0, .95, "Each patch is flattened to 49 numbers, then a learned matrix\n"
-                     "turns it into one 64-d token. That is the whole image-to-\n"
-                     "sequence step — PatchEmbed, a Conv2d whose kernel equals\n"
-                     "its stride, so patches never overlap.\n\n"
+    px = PATCH * PATCH
+    ax2.text(0, .97, f"{PATCH}x{PATCH} = {px} pixels", fontsize=13, va="top", color="#495057")
+    ax2.text(.355, .975, "\u2192", fontsize=26, va="top", color="#e8590c")
+    ax2.text(.45, .97, f"{D}-d token", fontsize=13, va="top", weight="bold")
+    ax2.text(0, .70, f"A learned {px}x{D} matrix does it — PatchEmbed, a Conv2d whose\n"
+                     f"kernel equals its stride, so patches never overlap. Note the\n"
+                     f"direction: {px} \u2192 {D} goes UP. A {PATCH}x{PATCH} scrap of pixels has no\n"
+                     f"room for \u201ctop bar of a 7\u201d to be a direction; {D} dimensions do.\n\n"
                      "Everything after this point is chapter 01 unchanged.",
              fontsize=10.5, va="top", linespacing=1.75)
 
@@ -176,8 +180,8 @@ def show_data(d, n=8, path="data_and_patches.png"):
         a.set_xlabel(k, fontsize=8, labelpad=2)
         if k == 0:
             a.set_ylabel("token", fontsize=9, rotation=0, ha="right", va="center", labelpad=8)
-    fig.text(.5, .215, "the sequence the transformer actually receives — "
-                       "16 tokens in raster order, plus a [CLS] token",
+    fig.text(.5, .215, f"the sequence the transformer actually receives — {NP} tokens "
+                       f"of {D} dims, raster order, plus a [CLS] token",
              ha="center", fontsize=10)
 
     fig.savefig(path, dpi=130, bbox_inches="tight")
