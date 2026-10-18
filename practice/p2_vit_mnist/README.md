@@ -12,6 +12,11 @@ python vit_mnist.py --only scale # just one
 
 No torchvision — MNIST arrives as one 11 MB `.npz`, so the file runs anywhere torch does.
 
+Running it writes two figures. `data_and_patches.png` first — the digits, one of them cut on
+the 7×7 grid, and the same 16 patches laid out as the strip the model actually receives. **The
+transformer never sees the 4×4 arrangement**, only those tokens in order, which is the whole
+setup for experiment 2.
+
 ## The point: three chapter claims, measured
 
 ### 1 · `train` — it works, and the attention maps are readable

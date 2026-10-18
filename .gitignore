@@ -13,5 +13,6 @@ practice/*/loss.png
 practice/*/heads.png
 practice/**/__pycache__/
 practice/*/attention_maps.png
+practice/*/data_and_patches.png
 practice/**/mnist.npz
 practice/**/data/

@@ -128,6 +128,63 @@ class SmallCNN(nn.Module):
         return self.f(x), []
 
 
+# ---------------------------------------------------------------- look at it
+def show_data(d, n=8, path="data_and_patches.png"):
+    """What the model is actually handed.
+
+    Row 1: digits. Row 2: ONE digit cut on the 7x7 grid. Row 3: the same 16
+    patches as the sequence the transformer receives. The model never sees the
+    square arrangement — only those 16 vectors in a row, which is exactly why
+    the positional encoding has to put the layout back.
+    """
+    (_, _), (Xte, Yte) = d
+    img = Xte[0, 0].cpu()
+    G = IMG // PATCH
+    fig = plt.figure(figsize=(12, 6.4))
+    gs = fig.add_gridspec(3, n, height_ratios=[1.0, 1.25, .62], hspace=.55)
+
+    for i in range(n):                                       # --- the data
+        ax = fig.add_subplot(gs[0, i])
+        ax.imshow(Xte[i, 0].cpu(), cmap="gray"); ax.axis("off")
+        ax.set_title(int(Yte[i]), fontsize=11)
+
+    ax = fig.add_subplot(gs[1, :2])                          # --- the cut
+    ax.imshow(img, cmap="gray")
+    for k in range(1, G):
+        ax.axhline(k * PATCH - .5, color="#e8590c", lw=1.6)
+        ax.axvline(k * PATCH - .5, color="#e8590c", lw=1.6)
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_title(f"cut into {G}x{G} = {NP} patches of {PATCH}x{PATCH}px", fontsize=10, pad=6)
+
+    ax2 = fig.add_subplot(gs[1, 2:])                         # --- what it means
+    ax2.axis("off")
+    ax2.text(0, .95, "Each patch is flattened to 49 numbers, then a learned matrix\n"
+                     "turns it into one 64-d token. That is the whole image-to-\n"
+                     "sequence step — PatchEmbed, a Conv2d whose kernel equals\n"
+                     "its stride, so patches never overlap.\n\n"
+                     "Everything after this point is chapter 01 unchanged.",
+             fontsize=10.5, va="top", linespacing=1.75)
+
+    inner = gs[2, :].subgridspec(1, NP, wspace=.22)          # --- the sequence
+    for k in range(NP):
+        r, c = divmod(k, G)
+        a = fig.add_subplot(inner[0, k])
+        a.imshow(img[r*PATCH:(r+1)*PATCH, c*PATCH:(c+1)*PATCH], cmap="gray",
+                 vmin=float(img.min()), vmax=float(img.max()))
+        a.set_xticks([]); a.set_yticks([])
+        for sp in a.spines.values(): sp.set_color("#e8590c"); sp.set_linewidth(1.3)
+        a.set_xlabel(k, fontsize=8, labelpad=2)
+        if k == 0:
+            a.set_ylabel("token", fontsize=9, rotation=0, ha="right", va="center", labelpad=8)
+    fig.text(.5, .215, "the sequence the transformer actually receives — "
+                       "16 tokens in raster order, plus a [CLS] token",
+             ha="center", fontsize=10)
+
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    print(f"  wrote {path}")
+    return path
+
+
 # ---------------------------------------------------------------- train / eval
 def run(model, Xtr, Ytr, Xte, Yte, epochs=3, bs=256, lr=3e-4, quiet=False):
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
@@ -226,7 +283,13 @@ if __name__ == "__main__":
     a = ap.parse_args()
     print(f"device {DEV}\n")
     d = load()
+    show_data(d)
+    times = {}
     for name, fn in (("train", exp_train), ("position", exp_position), ("scale", exp_scale)):
         if a.only in (None, name):
             print(f"\n=== {name} " + "=" * (60 - len(name)))
-            fn(d)
+            t0 = time.time(); fn(d); times[name] = time.time() - t0
+            print(f"\n  [{name}: {times[name]:.0f}s on {DEV}]")
+    if len(times) > 1:
+        print(f"\n=== total {sum(times.values()):.0f}s on {DEV} "
+              + " · ".join(f"{k} {v:.0f}s" for k, v in times.items()))
