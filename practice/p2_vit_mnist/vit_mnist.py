@@ -755,6 +755,43 @@ def why_64(d, n_img=4000):
 
 
 
+def is_it_padding(d):
+    """49 pixels -> 64 numbers. A transformation, or zeros in the spare slots?
+
+    Decide it by measurement. Zero-padding would copy the 49 inputs and leave
+    15 zeros; a linear map mixes every input into every output.
+    """
+    torch.manual_seed(0)
+    (_, _), (Xte, _) = d
+    m = ViT().to(DEV).eval()
+    px = Xte[0, 0, PATCH:2*PATCH, PATCH:2*PATCH].reshape(-1).cpu()   # patch 5
+    W = m.patch.proj.weight.reshape(D, -1).detach().cpu()
+    b = m.patch.proj.bias.detach().cpu()
+    out = W @ px + b
+
+    print(f"  if it were ZERO-PADDING: out[:{px.numel()}] == the pixels, out[{px.numel()}:] == 0\n")
+    print(f"    out[0:3]     {[round(v, 3) for v in out[:3].tolist()]}")
+    print(f"    pixels[0:3]  {[round(v, 3) for v in px[:3].tolist()]}   <- different")
+    print(f"    out[{px.numel()}:{px.numel()+3}]   {[round(v, 3) for v in out[px.numel():px.numel()+3].tolist()]}  <- NOT zero")
+    print(f"    outputs equal to some pixel : "
+          f"{int(((out[:, None] - px[None, :]).abs() < 1e-6).sum())}")
+    print(f"    outputs that are zero       : {int((out.abs() < 1e-6).sum())}")
+
+    px2 = px.clone(); px2[0] = 0.0
+    diff = (W @ px2 + b) - out
+    print(f"\n  change ONE pixel and {int((diff.abs() > 1e-7).sum())} of the {D} outputs move "
+          f"(largest {float(diff.abs().max()):+.4f}).")
+    print(f"  Each output is a dot product over all {px.numel()} pixels:")
+    for j in range(2):
+        terms = "  ".join(f"{W[j,i]:+.2f}*{px[i]:+.2f}" for i in range(3))
+        print(f"    dim {j}: {terms} + ... ({px.numel()} terms) + {b[j]:+.2f} = {float(out[j]):+.3f}")
+    print(f"\n  W is {tuple(W.shape)} = {W.numel():,} learned numbers. Row j is a "
+          f"{PATCH}x{PATCH} FILTER:")
+    print(f"  output j answers \"how much does this patch look like filter j?\"")
+    return out
+
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

@@ -27,6 +27,16 @@ wide. The eight blank patches come out **byte-identical**, because a blank patch
 the same background value and its token is `W @ (constant) + bias` wherever it sat. That makes
 the position argument concrete: at this stage token 0 and token 15 are indistinguishable.
 
+`is_it_padding()` settles whether 49 -> 64 is a transformation or zero-padding: no output
+equals any pixel, none is zero, and changing ONE pixel moves all 64 outputs. `W` is 64 rows of
+49 weights and row j is a 7x7 filter, so output j answers "how much does this patch look like
+filter j?".
+
+The patch projection here is not a teaching simplification — it is line-for-line what timm and
+the paper authors' own JAX code do (`nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size,
+stride=patch_size)` then `flatten(2).transpose(1,2)`), only with different numbers. Their
+comment says it best: *"We can merge s2d+emb into a single conv; it's the same."*
+
 `why_64()` answers why a token is 64-d when the patch is 49 pixels: 49 is forced by the patch
 size, 64 is chosen. Measured rather than asserted — the embedding matrix is `64 x 49`, so its
 rank is at most 49, and the singular values of 64,000 real tokens fall off a cliff at exactly
