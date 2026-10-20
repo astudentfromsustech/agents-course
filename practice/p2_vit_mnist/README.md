@@ -17,6 +17,11 @@ the 7×7 grid, and the same 16 patches laid out as the strip the model actually 
 transformer never sees the 4×4 arrangement**, only those tokens in order, which is the whole
 setup for experiment 2.
 
+`show_training()` opens up the loop that `exp_train` hides: every one of the 1 410 gradient
+steps, not just the six epoch-end printouts, plus what cross-entropy actually measures on a
+single digit (`p(7)` 0.077 → 0.998, loss 2.56 → 0.00). It also explains why the printed loss
+jitters — that number is only the *last* batch's, one of 235.
+
 ## The point: three chapter claims, measured
 
 ### 1 · `train` — it works, and the attention maps are readable

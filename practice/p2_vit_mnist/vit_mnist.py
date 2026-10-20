@@ -25,7 +25,7 @@ Three things the chapter CLAIMS, measured here instead of asserted:
 Run:  python vit_mnist.py              # all three
       python vit_mnist.py --only scale # just one
 """
-import argparse, os, time, urllib.request, numpy as np
+import argparse, math, os, time, urllib.request, numpy as np
 import torch, torch.nn as nn, torch.nn.functional as F
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -212,6 +212,102 @@ def acc(model, X, Y, perm=None, bs=1000):
     for i in range(0, X.shape[0], bs):
         ok += (model(X[i:i+bs], perm=perm)[0].argmax(-1) == Y[i:i+bs]).sum().item()
     return ok / X.shape[0]
+
+
+def show_training(d, epochs=6, bs=256, lr=3e-4, path="how_training_works.png"):
+    """Open up the training loop that exp_train() hides.
+
+    Five lines do all the work, once per batch:
+
+        logits = model(x)                 # guess
+        loss   = cross_entropy(logits, y) # how wrong, as ONE number
+        opt.zero_grad()                   # clear last batch's gradients
+        loss.backward()                   # d(loss)/d(every parameter)
+        opt.step()                        # nudge each parameter downhill
+
+    This records the loss at every step (not just the end of each epoch) and
+    the class probabilities for one test digit before and after, so the two
+    numbers printed during training stop being opaque.
+    """
+    (Xtr, Ytr), (Xte, Yte) = d
+    torch.manual_seed(0)
+    m = ViT().to(DEV)
+    opt = torch.optim.AdamW(m.parameters(), lr=lr, weight_decay=0.01)
+    n, k = Xtr.shape[0], 0
+    steps, losses, marks = [], [], []
+
+    probe, truth = Xte[:1], int(Yte[0])
+    with torch.no_grad():
+        p_before = m(probe)[0].softmax(-1)[0].cpu()
+
+    for ep in range(epochs):
+        m.train()
+        idx = torch.randperm(n, device=DEV)
+        for i in range(0, n, bs):
+            b = idx[i:i + bs]
+            loss = F.cross_entropy(m(Xtr[b])[0], Ytr[b])
+            opt.zero_grad(); loss.backward(); opt.step()
+            steps.append(k); losses.append(loss.item()); k += 1
+        marks.append((k, acc(m, Xte, Yte)))
+    with torch.no_grad():
+        p_after = m(probe)[0].softmax(-1)[0].cpu()
+
+    fig = plt.figure(figsize=(13, 6.2))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.5, 1], hspace=.45, wspace=.25)
+
+    ax = fig.add_subplot(gs[:, 0])                       # --- the curve
+    ax.plot(steps, losses, lw=.7, color="#adb5bd", label="loss, every batch")
+    w = 20
+    sm = [sum(losses[max(0, i-w):i+1]) / len(losses[max(0, i-w):i+1]) for i in range(len(losses))]
+    ax.plot(steps, sm, lw=2, color="#1c7ed6", label=f"moving average ({w} batches)")
+    for j, (x, _) in enumerate(marks):
+        ax.axvline(x, color="#dee2e6", lw=1, zorder=0)
+    ax.set_xlabel(f"gradient step  ({len(steps)} total = {epochs} epochs x {n//bs + 1} batches)")
+    ax.set_ylabel("cross-entropy loss")
+    ax.set_title("every parameter update, not just the end of each epoch", fontsize=10.5)
+    ax2 = ax.twinx()
+    ax2.plot([x for x, _ in marks], [a*100 for _, a in marks], "o-", color="#e8590c",
+             lw=1.8, ms=5, label="test accuracy")
+    ax2.set_ylabel("test accuracy (%)", color="#e8590c")
+    ax2.tick_params(axis="y", colors="#e8590c")
+    h1, l1 = ax.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=9, loc="upper right", framealpha=.95)
+    for sp in ("top",): ax.spines[sp].set_visible(False)
+
+    axl = fig.add_subplot(gs[0, 1]); axl.axis("off")     # --- the loop
+    axl.text(0, 1.0, "the whole loop, once per batch", fontsize=11, weight="bold", va="top")
+    axl.text(0, .80,
+             "logits = model(x)\n"
+             "loss   = cross_entropy(logits, y)\n"
+             "opt.zero_grad()\n"
+             "loss.backward()\n"
+             "opt.step()",
+             fontsize=10.5, va="top", family="monospace", linespacing=1.55, color="#1c7ed6")
+    axl.text(0, .17,
+             f"{len(steps)} steps total. The loss printed each epoch is just\n"
+             f"the LAST batch's — which is why it jitters.",
+             fontsize=9.5, va="top", color="#495057", linespacing=1.6)
+
+    axb = fig.add_subplot(gs[1, 1])                      # --- one example
+    xpos = range(10)
+    axb.bar([x - .2 for x in xpos], p_before, .4, label="at init", color="#ced4da")
+    axb.bar([x + .2 for x in xpos], p_after, .4, label="trained", color="#1c7ed6")
+    axb.axvline(truth, color="#e8590c", lw=1.2, ls="--", zorder=0)
+    axb.set_xticks(list(xpos)); axb.set_xlabel("predicted class")
+    axb.set_ylabel("probability")
+    axb.set_title(f"one test digit (true label {truth}) — what the loss measures",
+                  fontsize=10)
+    axb.legend(fontsize=9)
+    axb.text(.98, .62, f"p({truth}) {p_before[truth]:.3f} \u2192 {p_after[truth]:.3f}\n"
+                       f"loss = -log p:  {-math.log(float(p_before[truth])):.2f} "
+                       f"\u2192 {-math.log(float(p_after[truth])):.2f}",
+             transform=axb.transAxes, ha="right", va="top", fontsize=9.5,
+             bbox=dict(fc="#fff4e6", ec="#e8590c", lw=.8))
+    for sp in ("top", "right"): axb.spines[sp].set_visible(False)
+
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    print(f"  wrote {path}  ({len(steps)} steps, final {marks[-1][1]*100:.2f}%)")
+    return path
 
 
 # ---------------------------------------------------------------- experiments
