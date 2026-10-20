@@ -25,13 +25,13 @@
           <li class="l3"><a href="#s-why-it-matters-that-the-space-is-continuous">Why it matters that the space is continuous</a></li>
         </ul>
       </li>
-      <li><a href="../01_transformer/01a_tokens_to_vectors.html">— tokens → vectors</a>
+      <li><a href="../01_transformer/01_tokens_to_vectors.html">— tokens → vectors</a>
       </li>
-      <li><a href="../01_transformer/01_self_attention.html">— self-attention</a>
+      <li><a href="../01_transformer/02_self_attention.html">— self-attention</a>
       </li>
-      <li><a href="../01_transformer/01c_position.html">— position</a>
+      <li><a href="../01_transformer/03_position.html">— position</a>
       </li>
-      <li><a href="../01_transformer/02_transformer.html">— architecture</a>
+      <li><a href="../01_transformer/04_transformer.html">— architecture</a>
       </li>
       <li><a href="../02_LLM/02_LLM.html"><i>02</i>LLM</a>
       </li>
@@ -78,10 +78,10 @@
 
 <nav class="subnav"><span class="lbl">chapter 01</span>
 <span class="here">Representation</span>
-<a href="01a_tokens_to_vectors.html">Tokens &rarr; vectors</a>
-<a href="01_self_attention.html">Self-attention</a>
-<a href="01c_position.html">Position</a>
-<a href="02_transformer.html">The transformer</a>
+<a href="01_tokens_to_vectors.html">Tokens &rarr; vectors</a>
+<a href="02_self_attention.html">Self-attention</a>
+<a href="03_position.html">Position</a>
+<a href="04_transformer.html">The transformer</a>
 </nav>
 
 <header>
@@ -162,7 +162,7 @@ and why a network spends one half of itself <strong>raising</strong> dimension a
     <p><b>Why this is the deeper reason attention works at all.</b> Scoring two tokens with a raw dot
     product asks a question in the coordinates you were handed. <code>W<sup>q</sup></code> and
     <code>W<sup>k</sup></code> first move both tokens into a space where the question is easy —
-    <a href="01_self_attention.html#s-why-relevance-has-to-be-learned">the same move</a>, applied to
+    <a href="02_self_attention.html#s-why-relevance-has-to-be-learned">the same move</a>, applied to
     relevance rather than to classification.</p>
   </div>
 </section>
@@ -369,13 +369,13 @@ and why a network spends one half of itself <strong>raising</strong> dimension a
 
   <p class="handoff">Everything so far builds <i>one</i> vector per token, each still embedded in
   isolation — 苹果 has the same coordinates in “apple pie” and in “Apple released a phone”. Fixing that
-  is what the next parts are for: <a href="01a_tokens_to_vectors.html">tokens &rarr; vectors</a> builds
-  the dictionary entry, and <a href="01_self_attention.html">self-attention</a> lets the surrounding
+  is what the next parts are for: <a href="01_tokens_to_vectors.html">tokens &rarr; vectors</a> builds
+  the dictionary entry, and <a href="02_self_attention.html">self-attention</a> lets the surrounding
   words rewrite it.</p>
 </section>
 
 <div class="nextup">
-  <a href="01a_tokens_to_vectors.html"><span class="lbl">next</span><span class="ttl">From tokens to vectors</span><span class="sub">How a word becomes a vector, where the embedding matrix comes from, and what context does to it.</span></a>
+  <a href="01_tokens_to_vectors.html"><span class="lbl">next</span><span class="ttl">From tokens to vectors</span><span class="sub">How a word becomes a vector, where the embedding matrix comes from, and what context does to it.</span></a>
   <a href="../00_overview/00_overview.html"><span class="lbl">back</span><span class="ttl">Overview</span><span class="sub">How transformer, LLM and agent compose — the three-layer map.</span></a>
 </div>
 <p class="foot">knowledge_to_learn / agents — study notes. Figures on this page are screenshots from

@@ -43,6 +43,6 @@ genuinely trying is learning; reading it first is not.
 
 ## Then
 
-- `01_self_attention.html` §multi-head — the slide this exercise is testing
+- `02_self_attention.html` §multi-head — the slide this exercise is testing
 - [Transformer Puzzles](https://github.com/srush/Transformer-Puzzles) — the next question:
   not *how* attention computes, but *what* it can compute

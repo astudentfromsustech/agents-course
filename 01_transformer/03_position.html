@@ -18,11 +18,11 @@
       </li>
       <li><a href="../01_transformer/00_representation.html"><i>01</i>Transformer</a>
       </li>
-      <li><a href="../01_transformer/01a_tokens_to_vectors.html">— tokens → vectors</a>
+      <li><a href="../01_transformer/01_tokens_to_vectors.html">— tokens → vectors</a>
       </li>
-      <li><a href="../01_transformer/01_self_attention.html">— self-attention</a>
+      <li><a href="../01_transformer/02_self_attention.html">— self-attention</a>
       </li>
-      <li class="here"><a href="../01_transformer/01c_position.html">— position</a>
+      <li class="here"><a href="../01_transformer/03_position.html">— position</a>
         <ul class="toc-sec">
           <li class="l3"><a href="#s-position-the-one-thing-attention-cannot-see">Position: the one thing attention cannot see</a></li>
           <li class="l3"><a href="#s-the-same-layer-other-modalities">The same layer, other modalities</a></li>
@@ -32,7 +32,7 @@
           <li class="l3"><a href="#s-worked-case-a-hi-c-contact-matrix">Worked case: a Hi-C contact matrix</a></li>
         </ul>
       </li>
-      <li><a href="../01_transformer/02_transformer.html">— architecture</a>
+      <li><a href="../01_transformer/04_transformer.html">— architecture</a>
       </li>
       <li><a href="../02_LLM/02_LLM.html"><i>02</i>LLM</a>
       </li>
@@ -74,10 +74,10 @@
 </nav>
 <nav class="subnav"><span class="lbl">chapter 01</span>
 <a href="00_representation.html">Representation</a>
-<a href="01a_tokens_to_vectors.html">Tokens &rarr; vectors</a>
-<a href="01_self_attention.html">Self-attention</a>
+<a href="01_tokens_to_vectors.html">Tokens &rarr; vectors</a>
+<a href="02_self_attention.html">Self-attention</a>
 <span class="here">Position</span>
-<a href="02_transformer.html">The transformer</a>
+<a href="04_transformer.html">The transformer</a>
 </nav>
 <header>
   <p class="kicker">chapter 01 &middot; transformer &mdash; part 3 of 5</p>
@@ -564,7 +564,7 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
     <li><b>The diagonal dominates — for real this time.</b> Contact frequency decays as a power law with
     genomic distance, so raw counts near the diagonal swamp everything. Feed those in and the model
     learns <i>distance</i> and nothing else. Normalize first — observed/expected, or distance-stratified
-    — and note the irony: this is the same failure as the raw dot product <a href="01_self_attention.html#s-why-relevance-has-to-be-learned">above</a>,
+    — and note the irony: this is the same failure as the raw dot product <a href="02_self_attention.html#s-why-relevance-has-to-be-learned">above</a>,
     where <code>aⁱ·aⁱ</code> necessarily dominated its row. Different cause, identical symptom.</li>
     <li><b>Hi-C is symmetric; attention is not.</b> <code>contact(i,j) = contact(j,i)</code>, but
     <code>Wᑫ ≠ Wᵏ</code> exists precisely so that <code>α<sub>i,j</sub> ≠ α<sub>j,i</sub></code>. That is
@@ -626,8 +626,8 @@ PE(pos)<sub>2i+1</sub> = cos(ω<sub>i</sub> · pos)
 
 
 <div class="nextup">
-  <a href="02_transformer.html"><span class="lbl">next</span><span class="ttl">The transformer</span><span class="sub">Attention is one half of a block. Here is the stack it lives in — tokenizer to logits.</span></a>
-  <a href="01_self_attention.html"><span class="lbl">back</span><span class="ttl">Self-attention</span><span class="sub">Query, key, value — the mechanism derived from the problem it solves.</span></a>
+  <a href="04_transformer.html"><span class="lbl">next</span><span class="ttl">The transformer</span><span class="sub">Attention is one half of a block. Here is the stack it lives in — tokenizer to logits.</span></a>
+  <a href="02_self_attention.html"><span class="lbl">back</span><span class="ttl">Self-attention</span><span class="sub">Query, key, value — the mechanism derived from the problem it solves.</span></a>
 </div>
 <p class="foot">knowledge_to_learn / agents — study notes. Embedding and quadratic-form figures from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili). Remaining slides from Hung-yi Lee's Machine Learning course (NTU); diagrams and commentary written alongside them.</p>
 </div>

@@ -18,7 +18,7 @@
       </li>
       <li><a href="../01_transformer/00_representation.html"><i>01</i>Transformer</a>
       </li>
-      <li class="here"><a href="../01_transformer/01a_tokens_to_vectors.html">— tokens → vectors</a>
+      <li class="here"><a href="../01_transformer/01_tokens_to_vectors.html">— tokens → vectors</a>
         <ul class="toc-sec">
           <li class="l3"><a href="#s-where-this-sits-a-decoder-only-transformer">Where this sits: a decoder-only transformer</a></li>
           <li class="l3"><a href="#s-the-problem-attention-is-solving">The problem attention is solving</a></li>
@@ -27,11 +27,11 @@
           <li class="l3"><a href="#s-what-context-does-to-a-dictionary-entry">What context does to a dictionary entry</a></li>
         </ul>
       </li>
-      <li><a href="../01_transformer/01_self_attention.html">— self-attention</a>
+      <li><a href="../01_transformer/02_self_attention.html">— self-attention</a>
       </li>
-      <li><a href="../01_transformer/01c_position.html">— position</a>
+      <li><a href="../01_transformer/03_position.html">— position</a>
       </li>
-      <li><a href="../01_transformer/02_transformer.html">— architecture</a>
+      <li><a href="../01_transformer/04_transformer.html">— architecture</a>
       </li>
       <li><a href="../02_LLM/02_LLM.html"><i>02</i>LLM</a>
       </li>
@@ -74,9 +74,9 @@
 <nav class="subnav"><span class="lbl">chapter 01</span>
 <a href="00_representation.html">Representation</a>
 <span class="here">Tokens &rarr; vectors</span>
-<a href="01_self_attention.html">Self-attention</a>
-<a href="01c_position.html">Position</a>
-<a href="02_transformer.html">The transformer</a>
+<a href="02_self_attention.html">Self-attention</a>
+<a href="03_position.html">Position</a>
+<a href="04_transformer.html">The transformer</a>
 </nav>
 <header>
   <p class="kicker">chapter 01 &middot; transformer &mdash; part 1 of 5</p>
@@ -126,7 +126,7 @@ after  attention   this token, <b>in this context</b></code></pre>
 
   <p><b>The mechanism on this page is identical in all three.</b> What changes is only the wiring
   around it: whether a mask is applied, and whether keys and values come from the same sequence as the
-  queries (self-attention) or a different one (cross-attention). <a href="02_transformer.html">Part
+  queries (self-attention) or a different one (cross-attention). <a href="04_transformer.html">Part
   2</a> builds the encoder–decoder version and covers cross-attention; this page stays with the
   decoder-only case, because it is the one the rest of the course needs.</p>
 
@@ -146,7 +146,7 @@ after  attention   this token, <b>in this context</b></code></pre>
     a <b>loss</b>, and backpropagation walks it back into every parameter. The sequential, one-token-
     at-a-time behaviour you see from a deployed model is an <i>inference</i> behaviour; it is not how
     the thing was trained. (Why that gap matters:
-    <a href="01_self_attention.html#s-parallel-to-train-sequential-to-generate">parallel to train, sequential to generate</a>.)</p>
+    <a href="02_self_attention.html#s-parallel-to-train-sequential-to-generate">parallel to train, sequential to generate</a>.)</p>
   </div>
 
   <p>Two stages, in the author's framing — and the whole of this page is the second one:</p>
@@ -233,7 +233,7 @@ after  attention   this token, <b>in this context</b></code></pre>
 
   <p>So when the rest of this page says "the output <code>b¹</code>", that vector is not an answer —
   it is what gets added to position 1's running total before the next block sees it. The full path,
-  tokenizer to sampled token, is <a href="02_transformer.html">part 2</a>.</p>
+  tokenizer to sampled token, is <a href="04_transformer.html">part 2</a>.</p>
 
   <h3 id="s-the-problem-attention-is-solving">The problem attention is solving</h3>
 
@@ -297,7 +297,7 @@ after  attention   this token, <b>in this context</b></code></pre>
     vector stored per word, nothing more. “Change of basis” says what the table is <i>for</i>: the new
     axes need not be orthogonal, so the new coordinates can place related words near one another. The
     geometry is the point. It is also the cleanest way to see why the embedding for a Hi-C patch is the
-    <a href="01c_position.html#s-worked-case-a-hi-c-contact-matrix">same operation</a> — no one-hot to select a row, so
+    <a href="03_position.html#s-worked-case-a-hi-c-contact-matrix">same operation</a> — no one-hot to select a row, so
     the matrix acts on the whole input instead of picking from it.</p>
 
     <details class="more">
@@ -466,7 +466,7 @@ after  attention   this token, <b>in this context</b></code></pre>
   </section>
 
 <div class="nextup">
-  <a href="01_self_attention.html"><span class="lbl">next</span><span class="ttl">Self-attention</span><span class="sub">Query, key, value — the mechanism derived from the problem it solves.</span></a>
+  <a href="02_self_attention.html"><span class="lbl">next</span><span class="ttl">Self-attention</span><span class="sub">Query, key, value — the mechanism derived from the problem it solves.</span></a>
   <a href="00_representation.html"><span class="lbl">back</span><span class="ttl">Representation</span><span class="sub">Raising and lowering dimension, how features compose, and what a latent space is.</span></a>
 </div>
 <p class="foot">knowledge_to_learn / agents — study notes. Embedding and quadratic-form figures from 王木头学科学, <a target="_blank" rel="noopener noreferrer" href="https://www.bilibili.com/video/BV1XH4y1T76e/">《从编解码和词嵌入开始，一步一步理解 Transformer》</a> (Bilibili). Remaining slides from Hung-yi Lee's Machine Learning course (NTU); diagrams and commentary written alongside them.</p>

@@ -15,7 +15,7 @@ those consequences.
 | | | |
 |---|---|---|
 | 00 | [Overview](00_overview/00_overview.html) | Transformer → LLM → Agent: the map |
-| 01 | [Transformer](01_transformer/01_self_attention.html) · [architecture](01_transformer/02_transformer.html) | Self-attention, then the stack it lives in |
+| 01 | [Transformer](01_transformer/02_self_attention.html) · [architecture](01_transformer/04_transformer.html) | Self-attention, then the stack it lives in |
 | 02 | [LLM](02_LLM/02_LLM.html) | What training added — capability vs behaviour |
 | 03 | [Agent](03_agent/03_agent.html) | The loop, and why tools are just text |
 | 04 | [Context](04_context/04_context.html) | The context window is the whole state |
