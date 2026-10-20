@@ -18,7 +18,11 @@
       </li>
       <li><a href="../01_transformer/00_representation.html"><i>01</i>Transformer</a>
       </li>
+      <li><a href="../01_transformer/01a_tokens_to_vectors.html">— tokens → vectors</a>
+      </li>
       <li><a href="../01_transformer/01_self_attention.html">— self-attention</a>
+      </li>
+      <li><a href="../01_transformer/01c_position.html">— position</a>
       </li>
       <li class="here"><a href="../01_transformer/02_transformer.html">— architecture</a>
         <ul class="toc-sec">
@@ -70,11 +74,13 @@
 </nav>
 <nav class="subnav"><span class="lbl">chapter 01</span>
 <a href="00_representation.html">Representation</a>
+<a href="01a_tokens_to_vectors.html">Tokens &rarr; vectors</a>
 <a href="01_self_attention.html">Self-attention</a>
+<a href="01c_position.html">Position</a>
 <span class="here">The transformer</span>
 </nav>
 <header>
-  <p class="kicker">chapter 01 · transformer — part 2 of 3</p>
+  <p class="kicker">chapter 01 · transformer — part 4 of 5</p>
   <h1>The transformer</h1>
   <p class="lede">Self-attention moves information <strong>between</strong> positions. A transformer is what you get when you alternate that with computation <strong>within</strong> a position, wrap both in residual connections, and stack the result a hundred times.</p>
 </header>
@@ -757,8 +763,8 @@ out = A @ V                     <span class="cm"># weighted pull of everyone's v
 </div>
 
 <div class="nextup">
-  <a href="../00_overview/00_overview.html"><span class="lbl">next</span><span class="ttl">LLM and agent</span><span class="sub">What training turns this architecture into, and what a loop turns that into.</span></a>
-  <a href="../01_transformer/01_self_attention.html"><span class="lbl">back</span><span class="ttl">Self-attention</span><span class="sub">The mechanism inside the attention half of every block.</span></a>
+  <a href="../02_LLM/02_LLM.html"><span class="lbl">next</span><span class="ttl">LLM</span><span class="sub">What training on next-token prediction at scale actually produces.</span></a>
+  <a href="../01_transformer/01c_position.html"><span class="lbl">back</span><span class="ttl">Position</span><span class="sub">The one thing attention cannot see, and the other inputs the same layer reads.</span></a>
 </div>
 <p class="foot">knowledge_to_learn / agents — study notes. Slides from Hung-yi Lee's Machine Learning course (NTU); diagrams and commentary written alongside them.</p>
 </div>
