@@ -185,6 +185,7 @@ def show_data(d, n=8, path="data_and_patches.png"):
              ha="center", fontsize=10)
 
     fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)        # pyplot keeps every figure alive otherwise
     print(f"  wrote {path}")
     return path
 
@@ -306,6 +307,7 @@ def show_training(d, epochs=6, bs=256, lr=3e-4, path="how_training_works.png"):
     for sp in ("top", "right"): axb.spines[sp].set_visible(False)
 
     fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)        # pyplot keeps every figure alive otherwise
     print(f"  wrote {path}  ({len(steps)} steps, final {marks[-1][1]*100:.2f}%)")
     return path
 
@@ -507,6 +509,7 @@ def draw_flow(path="shape_flow.png", bs=256):
             fontsize=9.2, color=ACC, va="center", linespacing=1.65)
 
     fig.savefig(path, dpi=140, bbox_inches="tight")
+    plt.close(fig)        # pyplot keeps every figure alive otherwise
     print(f"  wrote {path}")
     return path
 
@@ -519,13 +522,21 @@ def draw_architecture(d, path="architecture.png"):
     (Xtr, _), (Xte, Yte) = d
     img = Xte[0, 0].cpu()
     N, BS = Xtr.shape[0], 256
+    mm = ViT()                                   # for parameter counts
+    grp = {}
+    for nm, prm in mm.named_parameters():
+        k = ("patch" if nm.startswith("patch") else "cls" if nm == "cls"
+             else "pos" if nm == "pos" else "blocks" if nm.startswith("blocks")
+             else "norm" if nm.startswith("norm") else "head")
+        grp[k] = grp.get(k, 0) + prm.numel()
+    TOT = sum(grp.values())
     NB = (N + BS - 1) // BS                      # batches per epoch
     EP = 6
     BLU, BLE, ACC, INK, GRY = "#aec7e8", "#4a6fa5", "#e8590c", "#212529", "#868e96"
     GRN, RED = "#8bc34a", "#e53935"
 
-    fig, ax = plt.subplots(figsize=(18.6, 5.4))
-    ax.set_xlim(2, 196); ax.set_ylim(11, 64); ax.axis("off")
+    fig, ax = plt.subplots(figsize=(18.6, 6.9))
+    ax.set_xlim(2, 196); ax.set_ylim(0, 64); ax.axis("off")
 
     def slab(x, y, w, h, dx=2.2, dy=1.6, fc=BLU, ec=BLE, lw=.8, a=1.0):
         """one isometric box: front face + top + right side"""
@@ -568,6 +579,7 @@ def draw_architecture(d, path="architecture.png"):
                                    fc=BLU, ec=BLE, lw=.7, zorder=3))
     bracket(33, 52, 54, "PatchEmbed", "Conv2d 7x7, stride 7\n(no overlap)")
     dims(42.5, 25.0, "16 patches\n(7 x 7 each = 49 px)")
+    ax.text(42.5, 19.4, f"learned: {grp['patch']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
     ax.annotate("", xy=(33, 38), xytext=(25, 38),
                 arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
     for (px, py) in [(6, 48), (6, 30)]:
@@ -578,6 +590,7 @@ def draw_architecture(d, path="architecture.png"):
     stack(63, 28, 11, 1.4, 16)
     bracket(62, 80, 54, "flatten + project", "each patch -> one 64-d token")
     dims(71, 25, "16 tokens x 64\n(a SEQUENCE now)")
+    ax.text(71, 19.4, "(the same matrix)", ha="center", fontsize=8.6, color=GRY)
 
     # 4 ---------------- prepend CLS + position
     ax.annotate("", xy=(93, 38), xytext=(86, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
@@ -586,6 +599,7 @@ def draw_architecture(d, path="architecture.png"):
     ax.text(tx + 5.5, ty + 5.4, "[CLS]", fontsize=9, color=ACC, weight="bold", ha="center")
     bracket(93, 111, 54, "+ [CLS]  + position", "position is ADDED, not appended")
     dims(102, 25, "17 tokens x 64")
+    ax.text(102, 19.4, f"learned: {grp['cls']+grp['pos']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
 
     # 5 ---------------- the blocks
     ax.annotate("", xy=(126, 38), xytext=(120, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
@@ -602,6 +616,7 @@ def draw_architecture(d, path="architecture.png"):
     ax.add_patch(Rectangle((130, 24.0), 25, 4.4, fc=BLU, ec=BLE, lw=.8, zorder=3))
     ax.text(142.5, 26.2, "MLP  64 -> 256 -> 64", ha="center", va="center", fontsize=8.4, color=INK)
     dims(142.5, 22.5, "(17 x 64) in -> (17 x 64) out", c=GRY)
+    ax.text(142.5, 17.8, f"learned: {grp['blocks']:,}  ({grp['blocks']//4:,} x 4)", ha="center", fontsize=9, color=ACC, weight="bold")
 
     # 6 ---------------- take the CLS row
     ax.annotate("", xy=(166, 38), xytext=(160, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
@@ -619,17 +634,24 @@ def draw_architecture(d, path="architecture.png"):
         ax.plot([181.5, 186.4], [38.5, yy], color=BLE, lw=.5, alpha=.55, zorder=1)
     ax.text(188, 53.5, "OUTPUT", ha="center", fontsize=10.5, weight="bold")
     dims(188, 22.0, "Linear(64, 10)\n-> softmax")
+    ax.text(188, 16.4, f"learned: {grp['head']+grp['norm']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
 
-    ax.text(99, 18.6, "Drawn for ONE image. Every tensor really carries a leading BATCH "
+    ax.text(99, 12.4, "Drawn for ONE image. Every tensor really carries a leading BATCH "
             "axis \u2014 (256, 17, 64), not (17, 64).", ha="center", fontsize=9.4, color=INK)
-    ax.text(99, 16.0, "The 256 ride through together \u2014 but never interact: attention mixes "
+    ax.text(99, 9.9, "The 256 ride through together \u2014 but never interact: attention mixes "
             "tokens WITHIN one image, so there are 256 separate 17x17 matrices.",
             ha="center", fontsize=9.4, color=GRY)
-    ax.text(99, 13.4, f"Training set {N:,} images  =  {NB-1} x {BS} + {N - (NB-1)*BS}  "
+    ax.text(99, 7.4, f"Training set {N:,} images  =  {NB-1} x {BS} + {N - (NB-1)*BS}  "
             f"\u2192  {NB} batches per epoch  x  {EP} epochs  =  {NB*EP:,} weight updates.",
             ha="center", fontsize=9.4, color=ACC, weight="bold")
+    ax.text(99, 4.9, f"Orange = LEARNED, {TOT:,} numbers in all, every one updated by the same "
+            "loss.backward() + opt.step().", ha="center", fontsize=9.4, color=INK)
+    ax.text(99, 2.4, "No parameters at all: Q\u00b7K\u1d40, the scaling, softmax, @V, the residual "
+            "adds, the [CLS] read-out \u2014 those are fixed arithmetic.",
+            ha="center", fontsize=9.4, color=GRY)
 
     fig.savefig(path, dpi=140, bbox_inches="tight")
+    plt.close(fig)        # pyplot keeps every figure alive otherwise
     print(f"  wrote {path}")
     return path
 
@@ -716,6 +738,7 @@ def show_tokens(d, path="tokens.png"):
              fontsize=9.2, va="top", linespacing=1.6, color="#212529")
 
     fig.savefig(path, dpi=140, bbox_inches="tight")
+    plt.close(fig)        # pyplot keeps every figure alive otherwise
     print(f"  wrote {path}  ({len(blank)} identical blank rows)")
     return path
 
@@ -792,6 +815,56 @@ def is_it_padding(d):
 
 
 
+def show_filters(d, epochs=6, path="filters.png"):
+    """The 64 patch filters, before and after training.
+
+    Row j of the embedding matrix is a PATCH-sized filter, so it can be drawn.
+    This trains a model and puts the filters at init beside the filters at the
+    end, plus the change, which is the honest way to see how much the patch
+    embedding actually learns on a task this small.
+    """
+    torch.manual_seed(0)
+    (Xtr, Ytr), (Xte, Yte) = d
+    m = ViT().to(DEV)
+    W0 = m.patch.proj.weight.detach().clone().cpu()
+    run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
+    W1 = m.patch.proj.weight.detach().clone().cpu()
+    acc1, cos = acc(m, Xte, Yte), float(F.cosine_similarity(W0.flatten(), W1.flatten(), dim=0))
+
+    def grid(ax, W, title, vlim=None):
+        v = vlim or float(W.abs().max())
+        pad, G = 1, 8
+        canvas = torch.full((G*(PATCH+pad)-pad, G*(PATCH+pad)-pad), float("nan"))
+        for k in range(D):
+            r, c = divmod(k, G)
+            canvas[r*(PATCH+pad):r*(PATCH+pad)+PATCH, c*(PATCH+pad):c*(PATCH+pad)+PATCH] = W[k, 0]
+        ax.imshow(canvas, cmap="RdBu_r", vmin=-v, vmax=v)
+        ax.set_xticks([]); ax.set_yticks([]); ax.set_title(title, fontsize=10.5)
+        return v
+
+    fig, axes = plt.subplots(1, 3, figsize=(13.2, 5.0))
+    v = grid(axes[0], W0, f"at init — {D} random {PATCH}x{PATCH} filters")
+    grid(axes[1], W1, f"after {epochs} epochs ({acc1*100:.1f}% test)", vlim=v)
+    dW = W1 - W0
+    grid(axes[2], dW, f"what training changed  (same colour scale)", vlim=v)
+
+    fig.text(.5, .055,
+             f"cosine(init, trained) = {cos:.4f} \u2014 the filters barely rotated, yet accuracy "
+             f"went 10% \u2192 {acc1*100:.1f}%.",
+             ha="center", fontsize=10.5, color="#e8590c", weight="bold")
+    fig.text(.5, .005,
+             f"mean |change| {dW.abs().mean():.4f}, largest {dW.abs().max():.4f}. On a task this "
+             f"small the patch embedding stays close to a random projection and the blocks above "
+             f"learn to read it.",
+             ha="center", fontsize=9.4, color="#495057")
+    fig.subplots_adjust(bottom=.16)
+    fig.savefig(path, dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  wrote {path}  (cosine {cos:.4f}, test {acc1*100:.2f}%)")
+    return cos
+
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own
@@ -815,6 +888,7 @@ def exp_train(d):
     ax[0, 0].set_ylabel("digit"); ax[1, 0].set_ylabel("[CLS] attn")
     fig.suptitle("what the [CLS] token reads, last layer, averaged over heads", fontsize=10)
     fig.tight_layout(); fig.savefig("attention_maps.png", dpi=130)
+    plt.close(fig)        # pyplot keeps every figure alive otherwise
     print("  wrote attention_maps.png")
     return m
 

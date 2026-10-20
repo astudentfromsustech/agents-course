@@ -27,6 +27,17 @@ wide. The eight blank patches come out **byte-identical**, because a blank patch
 the same background value and its token is `W @ (constant) + bias` wherever it sat. That makes
 the position argument concrete: at this stage token 0 and token 15 are indistinguishable.
 
+`show_filters()` answers "when are those weights learned?" — in the same loop as everything
+else. Row j of the embedding matrix is a 7x7 filter, so it can be drawn: at init, after six
+epochs, and the difference on the same colour scale. The third panel is nearly blank.
+`cosine(init, trained) = 0.99` while accuracy goes 10% -> 95%, so on a task this small the patch
+embedding stays close to a random projection and the blocks above learn to read it. That is a
+finding about this setup, not a general law.
+
+The architecture figure now also marks every learned group in orange (3,200 patch + 1,152
+CLS/position + 199,168 blocks + 778 head = 204,298) and names what has no parameters at all:
+Q.K', the scaling, softmax, @V, the residual adds, the [CLS] read-out.
+
 `is_it_padding()` settles whether 49 -> 64 is a transformation or zero-padding: no output
 equals any pixel, none is zero, and changing ONE pixel moves all 64 outputs. `W` is 64 rows of
 49 weights and row j is a 7x7 filter, so output j answers "how much does this patch look like
