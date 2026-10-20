@@ -511,6 +511,112 @@ def draw_flow(path="shape_flow.png", bs=256):
     return path
 
 
+def draw_architecture(d, path="architecture.png"):
+    """The network drawn the way CNN papers draw one: left to right, slabs
+    sized by their tensor, the digit at one end and the ten classes at the other.
+    """
+    from matplotlib.patches import Polygon, Rectangle, Circle, FancyArrowPatch
+    (_, _), (Xte, Yte) = d
+    img = Xte[0, 0].cpu()
+    BLU, BLE, ACC, INK, GRY = "#aec7e8", "#4a6fa5", "#e8590c", "#212529", "#868e96"
+    GRN, RED = "#8bc34a", "#e53935"
+
+    fig, ax = plt.subplots(figsize=(18.6, 5.4))
+    ax.set_xlim(2, 196); ax.set_ylim(13, 63); ax.axis("off")
+
+    def slab(x, y, w, h, dx=2.2, dy=1.6, fc=BLU, ec=BLE, lw=.8, a=1.0):
+        """one isometric box: front face + top + right side"""
+        ax.add_patch(Polygon([(x,y),(x+w,y),(x+w,y+h),(x,y+h)], fc=fc, ec=ec, lw=lw, alpha=a, zorder=3))
+        ax.add_patch(Polygon([(x,y+h),(x+dx,y+h+dy),(x+w+dx,y+h+dy),(x+w,y+h)], fc=fc, ec=ec, lw=lw, alpha=a*.75, zorder=3))
+        ax.add_patch(Polygon([(x+w,y),(x+w+dx,y+dy),(x+w+dx,y+h+dy),(x+w,y+h)], fc=fc, ec=ec, lw=lw, alpha=a*.55, zorder=3))
+
+    def stack(x, y, w, h, n, step=.72, **kw):
+        for i in range(n - 1, -1, -1):
+            slab(x + i*step, y + i*step*.72, w, h, **kw)
+        return x + (n-1)*step, y + (n-1)*step*.72      # origin of the TOP slab
+
+    def bracket(x0, x1, y, label, sub="", c=INK):
+        ax.plot([x0, x1], [y, y], color=c, lw=1.1)
+        for xx in (x0, x1): ax.plot([xx, xx], [y, y + 1.4], color=c, lw=1.1)
+        ax.plot([(x0+x1)/2]*2, [y, y - 1.4], color=c, lw=1.1)
+        ax.text((x0+x1)/2, y - 3.0, label, ha="center", va="bottom", fontsize=10.5,
+                weight="bold", color=c)
+        if sub:
+            ax.text((x0+x1)/2, y - 7.4, sub, ha="center", va="bottom", fontsize=9, color=c)
+
+    def dims(x, y, t, c=INK):
+        ax.text(x, y, t, ha="center", va="top", fontsize=9.5, color=c)
+
+    # 1 ---------------- input digit
+    ax.imshow(img, cmap="gray_r", extent=[6, 24, 30, 48], zorder=3)
+    ax.add_patch(Rectangle((6, 30), 18, 18, fill=False, ec=INK, lw=1.2, zorder=4))
+    ax.text(15, 51.5, "INPUT", ha="center", fontsize=10.5, weight="bold")
+    dims(15, 28.5, "(28 x 28 x 1)")
+
+    # 2 ---------------- 16 patches
+    for r in range(4):
+        for c in range(4):
+            ax.add_patch(Rectangle((34 + c*4.4, 42.5 - r*4.4), 4.0, 4.0,
+                                   fc=BLU, ec=BLE, lw=.7, zorder=3))
+    bracket(33, 52, 54, "PatchEmbed", "Conv2d 7x7, stride 7\n(no overlap)")
+    dims(42.5, 25.0, "16 patches\n(7 x 7 each = 49 px)")
+    ax.annotate("", xy=(33, 38), xytext=(25, 38),
+                arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
+    for (px, py) in [(6, 48), (6, 30)]:
+        ax.plot([24, 34], [py, 46.5 if py > 40 else 29.9], color=GRY, lw=.7, ls=(0, (3, 3)), zorder=1)
+
+    # 3 ---------------- token sequence (16 -> 17 planes of width 64)
+    ax.annotate("", xy=(62, 38), xytext=(54, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
+    stack(63, 28, 11, 1.4, 16)
+    bracket(62, 80, 54, "flatten + project", "each patch -> one 64-d token")
+    dims(71, 25, "16 tokens x 64\n(a SEQUENCE now)")
+
+    # 4 ---------------- prepend CLS + position
+    ax.annotate("", xy=(93, 38), xytext=(86, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
+    tx, ty = stack(94, 28, 11, 1.4, 16)
+    slab(tx + .72, ty + 1.92, 11, 1.4, fc="#ffd8a8", ec=ACC, lw=1.1)
+    ax.text(tx + 5.5, ty + 5.4, "[CLS]", fontsize=9, color=ACC, weight="bold", ha="center")
+    bracket(93, 111, 54, "+ [CLS]  + position", "position is ADDED, not appended")
+    dims(102, 25, "17 tokens x 64")
+
+    # 5 ---------------- the blocks
+    ax.annotate("", xy=(126, 38), xytext=(120, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
+    ax.add_patch(Rectangle((126, 20.5), 33, 35, fc="#fff9db", ec=ACC, lw=1.6, zorder=2))
+    ax.text(142.5, 57.6, "4 x  TRANSFORMER BLOCK", ha="center", fontsize=10.5,
+            weight="bold", color=ACC)
+    for i in range(3, -1, -1):                       # 4 heads of a 17x17 matrix
+        ax.add_patch(Rectangle((135 + i*1.1, 38 + i*.9), 11, 11,
+                               fc="#ffd8a8", ec=ACC, lw=.9, zorder=3))
+    ax.text(142.5, 36.0, "attention  17 x 17, 4 heads", ha="center", va="top",
+            fontsize=8.6, color=ACC, weight="bold")
+    ax.text(142.5, 33.0, "the ONLY step that mixes tokens", ha="center", va="top",
+            fontsize=8.2, color=GRY, style="italic")
+    ax.add_patch(Rectangle((130, 24.0), 25, 4.4, fc=BLU, ec=BLE, lw=.8, zorder=3))
+    ax.text(142.5, 26.2, "MLP  64 -> 256 -> 64", ha="center", va="center", fontsize=8.4, color=INK)
+    dims(142.5, 22.5, "(17 x 64) in -> (17 x 64) out", c=GRY)
+
+    # 6 ---------------- take the CLS row
+    ax.annotate("", xy=(166, 38), xytext=(160, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
+    slab(166, 37.2, 13, 1.6, fc="#ffd8a8", ec=ACC, lw=1.1)
+    bracket(165, 181, 54, "take row 0", "the other 16 tokens\nare discarded")
+    dims(172, 33.5, "[CLS] only:  64")
+
+    # 7 ---------------- the ten classes
+    for i, lab in enumerate(["0", "1", "2", "...", "9"]):
+        yy = 48 - i * 5.2
+        if lab == "...":
+            ax.text(188, yy, "\u22ee", ha="center", va="center", fontsize=13); continue
+        ax.add_patch(Circle((188, yy), 1.55, fc=RED, ec="#b71c1c", lw=.8, zorder=4))
+        ax.text(191.2, yy, lab, va="center", fontsize=10, weight="bold")
+        ax.plot([181.5, 186.4], [38.5, yy], color=BLE, lw=.5, alpha=.55, zorder=1)
+    ax.text(188, 53.5, "OUTPUT", ha="center", fontsize=10.5, weight="bold")
+    dims(188, 22.0, "Linear(64, 10)\n-> softmax")
+
+    fig.savefig(path, dpi=140, bbox_inches="tight")
+    print(f"  wrote {path}")
+    return path
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

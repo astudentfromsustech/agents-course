@@ -22,6 +22,12 @@ shape from a live tensor, so it cannot drift from the code. It is the fastest wa
 the 17x17 attention matrix is the only place information crosses between positions, and that
 the block shape `(B, 17, 64)` never changes, which is why blocks stack.
 
+`draw_architecture()` draws the model the way CNN papers draw one — slabs left to right, the
+digit at one end and the ten classes at the other. Worth comparing against a CNN diagram: a
+CNN's slabs shrink (28->24->12->8->4) because every conv and pool trades resolution for
+channels, while the ViT's stays `17 x 64` from the first block to the last. No pooling, no
+stride, nothing shrinks.
+
 `draw_flow()` is that same trace as a diagram: the whole path down the left, one block opened
 up on the right, with the 17x17 attention matrix marked as the only step where information
 crosses between positions.
