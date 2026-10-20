@@ -654,6 +654,73 @@ def batch_check(d, n=256):
     return diff
 
 
+def show_tokens(d, path="tokens.png"):
+    """The real 16 x 64 matrix for one digit, drawn.
+
+    Every row IS one token: 64 numbers describing one 7x7 patch. The blank
+    patches produce byte-identical rows, because the embedding is a pure
+    function of the 49 pixels -- nothing about WHERE the patch sat has been
+    added yet.
+    """
+    torch.manual_seed(0)
+    (_, _), (Xte, Yte) = d
+    m = ViT().to(DEV).eval()
+    with torch.no_grad():
+        T = m.patch(Xte[:1])[0].cpu()
+    img, G = Xte[0, 0].cpu(), IMG // PATCH
+    ink = [float((img[k//G*PATCH:(k//G+1)*PATCH, k%G*PATCH:(k%G+1)*PATCH].std())) for k in range(NP)]
+    blank = [k for k in range(NP) if ink[k] < 1e-6]
+
+    fig = plt.figure(figsize=(14.5, 5.6))
+    gs = fig.add_gridspec(1, 3, width_ratios=[.85, 2.5, 1.15], wspace=.33)
+
+    ax = fig.add_subplot(gs[0, 0])                       # the patches, numbered
+    ax.imshow(img, cmap="gray")
+    for k in range(1, G):
+        ax.axhline(k*PATCH - .5, color="#e8590c", lw=1.3)
+        ax.axvline(k*PATCH - .5, color="#e8590c", lw=1.3)
+    for k in range(NP):
+        r, c = divmod(k, G)
+        ax.text(c*PATCH + 3, r*PATCH + 3.6, str(k), color="#e8590c", fontsize=9,
+                ha="center", va="center", weight="bold")
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_title(f"{NP} patches, numbered", fontsize=10)
+
+    ax2 = fig.add_subplot(gs[0, 1])                      # THE matrix
+    v = float(T.abs().max())
+    im = ax2.imshow(T, cmap="RdBu_r", vmin=-v, vmax=v, aspect="auto")
+    ax2.set_yticks(range(NP)); ax2.set_yticklabels(range(NP), fontsize=8)
+    ax2.set_ylabel("token", fontsize=9.5)
+    ax2.set_title(f"the real matrix:  {NP} tokens x {D}   (one ROW = one token)", fontsize=10.5)
+    for k in blank:
+        ax2.add_patch(plt.Rectangle((-.5, k-.5), D, 1, fill=False, ec="#2f9e44", lw=1.4))
+    ax2.set_xlabel(f"the {D} numbers of each token  ->", fontsize=9.5)
+    ax2.text(.5, -.175, f"the {len(blank)} green rows are BYTE-IDENTICAL \u2014 every blank patch "
+             "gives the same 64 numbers", transform=ax2.transAxes, ha="center",
+             fontsize=9.6, color="#2f9e44", weight="bold")
+    fig.colorbar(im, ax=ax2, fraction=.025, pad=.085)
+
+    ax3 = fig.add_subplot(gs[0, 2]); ax3.axis("off")     # the actual numbers
+    def row(tok, y, c):
+        ax3.text(0, y, f"token {tok}", fontsize=10, weight="bold", color=c)
+        for r in range(4):
+            ax3.text(0, y - .055 - r*.047,
+                     " ".join(f"{x:+5.2f}" for x in T[tok, r*4:(r+1)*4].tolist()),
+                     fontsize=8.6, family="monospace", color="#212529")
+        ax3.text(0, y - .055 - 4*.047, "...  (64 numbers)", fontsize=8.2, color="#868e96")
+    row(0, .97, "#2f9e44"); row(6, .60, "#c92a2a")
+    ax3.text(0, .22, "token 0 is blank background.\nIts 64 numbers are exactly\n"
+                     "W @ (constant pixels) + bias,\nthe same for all 8 blank patches.\n\n"
+                     "Nothing about WHERE the patch\nsat has been added yet \u2014 that is\n"
+                     "the positional encoding's job,\none step later.",
+             fontsize=9.2, va="top", linespacing=1.6, color="#212529")
+
+    fig.savefig(path, dpi=140, bbox_inches="tight")
+    print(f"  wrote {path}  ({len(blank)} identical blank rows)")
+    return path
+
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

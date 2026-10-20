@@ -22,6 +22,11 @@ shape from a live tensor, so it cannot drift from the code. It is the fastest wa
 the 17x17 attention matrix is the only place information crosses between positions, and that
 the block shape `(B, 17, 64)` never changes, which is why blocks stack.
 
+`show_tokens()` draws the real `16 x 64` matrix for one digit — every row a token, 64 numbers
+wide. The eight blank patches come out **byte-identical**, because a blank patch is 49 copies of
+the same background value and its token is `W @ (constant) + bias` wherever it sat. That makes
+the position argument concrete: at this stage token 0 and token 15 are indistinguishable.
+
 `batch_check()` answers the question the architecture diagram raises: training is batched (256
 images at once), so do they contaminate each other? Measured, not assumed — image 0's logits
 are the same to 4e-07 whether it travels with 255 companions or alone, because the attention
