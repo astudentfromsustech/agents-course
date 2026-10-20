@@ -310,6 +310,89 @@ def show_training(d, epochs=6, bs=256, lr=3e-4, path="how_training_works.png"):
     return path
 
 
+def trace_shapes(d, bs=256):
+    """Walk ONE batch through the model, printing every tensor on the way.
+
+    Nothing here is hand-written: each shape comes from a real tensor produced
+    by the same modules training uses. Run it and the five-line loop stops
+    being opaque.
+    """
+    (Xtr, Ytr), _ = d
+    torch.manual_seed(0)
+    m = ViT().to(DEV)
+    x, y = Xtr[:bs], Ytr[:bs]
+    hd = D // HEADS
+
+    def p(label, t, note=""):
+        shape = str(tuple(t.shape)) if torch.is_tensor(t) else str(t)
+        print(f"  {label:<34}{shape:<22}{note}")
+
+    print("\nFORWARD" + "-" * 66)
+    p("x  (one batch)", x, f"{bs} images, 1 channel, 28x28")
+    t = m.patch.proj(x)
+    p("  Conv2d(1,64,k=7,s=7)", t, "64 filters, 7x7, non-overlapping")
+    t = t.flatten(2).transpose(1, 2)
+    p("  flatten+transpose", t, f"-> a SEQUENCE: {NP} tokens of {D} dims")
+    t = torch.cat([m.cls.expand(bs, -1, -1), t], 1)
+    p("  prepend [CLS]", t, f"{NP}+1 = {NP+1} tokens")
+    t = t + m.pos
+    p("  + positional encoding", t, "same shape: position is ADDED, not appended")
+
+    b = m.blocks[0]
+    print("\n  block 1 of 4" + "-" * 55)
+    h = b.n1(t)
+    p("    LayerNorm", h)
+    qkv = b.qkv(h)
+    p("    Linear(64,192)", qkv, "= 3 x 64, one slab each for q, k, v")
+    q, k, v = qkv.chunk(3, dim=-1)
+    p("    chunk -> q (k,v same)", q)
+    q4, k4, v4 = [z.view(bs, NP+1, HEADS, hd).transpose(1, 2) for z in (q, k, v)]
+    p("    split into heads", q4, f"{HEADS} heads x {hd} dims  ({HEADS}x{hd}={D})")
+    att = (q4 @ k4.transpose(-2, -1)) / hd ** .5
+    p("    q @ k^T / sqrt(d)", att, "<- THE attention matrix, 17x17 per head")
+    att = att.softmax(-1)
+    p("    softmax(dim=-1)", att, f"each row sums to 1: {float(att[0,0,0].sum().detach()):.4f}")
+    o = att @ v4
+    p("    att @ v", o, "weighted average of value vectors")
+    o = o.transpose(1, 2).reshape(bs, NP+1, D)
+    p("    merge heads", o, "concatenate the 4 heads back to 64")
+    o = b.proj(o)
+    p("    Linear(64,64)  = W_O", o)
+    t2 = t + o
+    p("    x + attn(...)", t2, "RESIDUAL: add, never replace")
+    t3 = t2 + b.mlp(b.n2(t2))
+    p("    x + mlp(norm(x))", t3, "mlp widens 64 -> 256 -> 64, per position")
+
+    for blk in m.blocks[1:]:
+        t3, _ = blk(t3)
+    print()
+    p("after all 4 blocks", t3, "shape NEVER changes -- that is why they stack")
+    t4 = m.norm(t3)
+    p("final LayerNorm", t4)
+    cls = t4[:, 0]
+    p("take row 0 ([CLS] only)", cls, f"the other {NP} tokens are discarded here")
+    logits = m.head(cls)
+    p("Linear(64,10)", logits, "one score per digit class")
+
+    print("\nLOSS" + "-" * 69)
+    loss = F.cross_entropy(logits, y)
+    p("y  (true labels)", y, f"integers 0-9, e.g. {y[:6].tolist()}")
+    p("cross_entropy(logits,y)", f"scalar {loss.detach().item():.4f}", "ONE number from 256x10")
+
+    print("\nBACKWARD" + "-" * 65)
+    print(f"  loss.backward() fills .grad on every parameter, SAME shape as the parameter:")
+    m.zero_grad(); loss.backward()
+    shown = 0
+    for n_, prm in m.named_parameters():
+        if shown < 5:
+            print(f"    {n_:<28}{str(tuple(prm.shape)):<18}grad {tuple(prm.grad.shape)}")
+            shown += 1
+    tot = sum(prm.numel() for prm in m.parameters())
+    print(f"    ... {len(list(m.parameters()))} tensors, {tot:,} numbers total")
+    print(f"\n  opt.step() moves each of those {tot:,} numbers a little way downhill.")
+    return m
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

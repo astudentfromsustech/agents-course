@@ -17,6 +17,11 @@ the 7×7 grid, and the same 16 patches laid out as the strip the model actually 
 transformer never sees the 4×4 arrangement**, only those tokens in order, which is the whole
 setup for experiment 2.
 
+`trace_shapes()` walks one batch through the model, printing every tensor on the way — every
+shape from a live tensor, so it cannot drift from the code. It is the fastest way to see that
+the 17x17 attention matrix is the only place information crosses between positions, and that
+the block shape `(B, 17, 64)` never changes, which is why blocks stack.
+
 `show_training()` opens up the loop that `exp_train` hides: every one of the 1 410 gradient
 steps, not just the six epoch-end printouts, plus what cross-entropy actually measures on a
 single digit (`p(7)` 0.077 → 0.998, loss 2.56 → 0.00). It also explains why the printed loss
