@@ -721,6 +721,40 @@ def show_tokens(d, path="tokens.png"):
 
 
 
+def why_64(d, n_img=4000):
+    """Why is a token 64-d when the patch is only 7x7 = 49 pixels?
+
+    Because 49 is forced by the patch size and 64 is CHOSEN. This measures
+    what the extra dimensions actually contain: the embedding matrix is
+    64 x 49, so its rank is at most 49, and every token really lives in a
+    49-dimensional slice of the 64-d space.
+    """
+    torch.manual_seed(0)
+    (Xtr, _), _ = d
+    m = ViT().to(DEV).eval()
+    px = PATCH * PATCH
+    W = m.patch.proj.weight.reshape(D, -1).detach().cpu()
+    b = m.patch.proj.bias.detach().cpu().double()
+    print(f"  PatchEmbed matrix : {tuple(W.shape)}  ->  {px} numbers in, {D} out")
+    print(f"  its rank          : {torch.linalg.matrix_rank(W).item()}  (at most min({D}, {px}) = {px})\n")
+
+    with torch.no_grad():
+        T = m.patch(Xtr[:n_img]).reshape(-1, D).cpu().double()
+    s = torch.linalg.svdvals(T - b)
+    s = s / s[0]
+    print(f"  {T.shape[0]:,} real tokens. Singular values of (tokens - bias), largest = 1:")
+    for k in (0, 20, px - 2, px - 1, px, px + 1, D - 1):
+        tag = "  <- noise floor" if k >= px else ""
+        print(f"    sigma[{k:2}] = {s[k]:.3e}{tag}")
+    drop = float(s[px - 1] / s[px])
+    print(f"\n  sigma[{px-1}] -> sigma[{px}] falls by a factor of {drop:,.0f}.")
+    print(f"  So the tokens span exactly {px} directions, not {D}.")
+    print(f"  The other {D - px} start EMPTY \u2014 they are scratch space the blocks write into,")
+    print(f"  because every sub-layer ADDS to the residual stream rather than replacing it.")
+    return s
+
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

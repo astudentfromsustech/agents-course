@@ -27,6 +27,12 @@ wide. The eight blank patches come out **byte-identical**, because a blank patch
 the same background value and its token is `W @ (constant) + bias` wherever it sat. That makes
 the position argument concrete: at this stage token 0 and token 15 are indistinguishable.
 
+`why_64()` answers why a token is 64-d when the patch is 49 pixels: 49 is forced by the patch
+size, 64 is chosen. Measured rather than asserted — the embedding matrix is `64 x 49`, so its
+rank is at most 49, and the singular values of 64,000 real tokens fall off a cliff at exactly
+index 49. The spare 15 directions start empty; they are scratch space the blocks write into,
+since every sub-layer adds to the residual stream rather than replacing it.
+
 `batch_check()` answers the question the architecture diagram raises: training is batched (256
 images at once), so do they contaminate each other? Measured, not assumed — image 0's logits
 are the same to 4e-07 whether it travels with 255 companions or alone, because the attention
