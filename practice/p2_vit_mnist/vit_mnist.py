@@ -547,11 +547,15 @@ def draw_architecture(d, path="architecture.png"):
     def dims(x, y, t, c=INK):
         ax.text(x, y, t, ha="center", va="top", fontsize=9.5, color=c)
 
-    # 1 ---------------- input digit
+    # 1 ---------------- input: a BATCH of digits, not one
+    for k in (2, 1):
+        ax.add_patch(Rectangle((6 + k*1.6, 30 + k*1.6), 18, 18, fc="#ffffff",
+                               ec=GRY, lw=.9, zorder=2))
     ax.imshow(img, cmap="gray_r", extent=[6, 24, 30, 48], zorder=3)
     ax.add_patch(Rectangle((6, 30), 18, 18, fill=False, ec=INK, lw=1.2, zorder=4))
-    ax.text(15, 51.5, "INPUT", ha="center", fontsize=10.5, weight="bold")
-    dims(15, 28.5, "(28 x 28 x 1)")
+    ax.text(15, 55.0, "INPUT", ha="center", fontsize=10.5, weight="bold")
+    ax.text(15, 52.2, "a batch of 256", ha="center", fontsize=8.8, color=ACC)
+    dims(15, 28.5, "(256, 1, 28, 28)")
 
     # 2 ---------------- 16 patches
     for r in range(4):
@@ -612,9 +616,35 @@ def draw_architecture(d, path="architecture.png"):
     ax.text(188, 53.5, "OUTPUT", ha="center", fontsize=10.5, weight="bold")
     dims(188, 22.0, "Linear(64, 10)\n-> softmax")
 
+    ax.text(99, 17.4, "Drawn for ONE image. Every tensor really carries a leading BATCH "
+            "axis \u2014 (256, 17, 64), not (17, 64).", ha="center", fontsize=9.4, color=INK)
+    ax.text(99, 14.6, "The 256 ride through together \u2014 but never interact: attention mixes "
+            "tokens WITHIN one image, so there are 256 separate 17x17 matrices.",
+            ha="center", fontsize=9.4, color=GRY)
+
     fig.savefig(path, dpi=140, bbox_inches="tight")
     print(f"  wrote {path}")
     return path
+
+
+def batch_check(d, n=256):
+    """Do images in a batch influence each other? Measure it, do not assume."""
+    (_, _), (Xte, _) = d
+    torch.manual_seed(0)
+    m = ViT().to(DEV).eval()
+    with torch.no_grad():
+        big, alone = m(Xte[:n])[0], m(Xte[:1])[0]
+        _, maps = m(Xte[:n], keep_attn=True)
+    diff = float((big[0] - alone[0]).abs().max())
+    print(f"  image 0 inside a batch of {n}, vs computed completely alone:")
+    print(f"    batch : {[round(v, 4) for v in big[0, :5].tolist()]} ...")
+    print(f"    alone : {[round(v, 4) for v in alone[0, :5].tolist()]} ...")
+    print(f"    max difference {diff:.2e}   identical: "
+          f"{torch.allclose(big[0], alone[0], atol=1e-5)}")
+    print(f"\n  attention matrix {tuple(maps[0].shape)} = {n} SEPARATE 17x17 matrices,")
+    print("  one per image, per head. Nothing ever scores a token of image i")
+    print("  against a token of image j.")
+    return diff
 
 
 # ---------------------------------------------------------------- experiments

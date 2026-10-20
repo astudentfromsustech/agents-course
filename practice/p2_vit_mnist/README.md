@@ -22,6 +22,12 @@ shape from a live tensor, so it cannot drift from the code. It is the fastest wa
 the 17x17 attention matrix is the only place information crosses between positions, and that
 the block shape `(B, 17, 64)` never changes, which is why blocks stack.
 
+`batch_check()` answers the question the architecture diagram raises: training is batched (256
+images at once), so do they contaminate each other? Measured, not assumed — image 0's logits
+are the same to 4e-07 whether it travels with 255 companions or alone, because the attention
+tensor is 256 *separate* 17x17 matrices and nothing contracts the batch axis. The one place the
+batch genuinely combines is the loss, which averages over all 256.
+
 `draw_architecture()` draws the model the way CNN papers draw one — slabs left to right, the
 digit at one end and the ten classes at the other. Worth comparing against a CNN diagram: a
 CNN's slabs shrink (28->24->12->8->4) because every conv and pool trades resolution for
