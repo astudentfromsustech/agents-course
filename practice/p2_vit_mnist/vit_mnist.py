@@ -516,13 +516,16 @@ def draw_architecture(d, path="architecture.png"):
     sized by their tensor, the digit at one end and the ten classes at the other.
     """
     from matplotlib.patches import Polygon, Rectangle, Circle, FancyArrowPatch
-    (_, _), (Xte, Yte) = d
+    (Xtr, _), (Xte, Yte) = d
     img = Xte[0, 0].cpu()
+    N, BS = Xtr.shape[0], 256
+    NB = (N + BS - 1) // BS                      # batches per epoch
+    EP = 6
     BLU, BLE, ACC, INK, GRY = "#aec7e8", "#4a6fa5", "#e8590c", "#212529", "#868e96"
     GRN, RED = "#8bc34a", "#e53935"
 
     fig, ax = plt.subplots(figsize=(18.6, 5.4))
-    ax.set_xlim(2, 196); ax.set_ylim(13, 63); ax.axis("off")
+    ax.set_xlim(2, 196); ax.set_ylim(11, 64); ax.axis("off")
 
     def slab(x, y, w, h, dx=2.2, dy=1.6, fc=BLU, ec=BLE, lw=.8, a=1.0):
         """one isometric box: front face + top + right side"""
@@ -548,14 +551,15 @@ def draw_architecture(d, path="architecture.png"):
         ax.text(x, y, t, ha="center", va="top", fontsize=9.5, color=c)
 
     # 1 ---------------- input: a BATCH of digits, not one
-    for k in (2, 1):
-        ax.add_patch(Rectangle((6 + k*1.6, 30 + k*1.6), 18, 18, fc="#ffffff",
+    for k in (3, 2, 1):
+        ax.add_patch(Rectangle((6 + k*1.5, 30 + k*1.5), 18, 18, fc="#ffffff",
                                ec=GRY, lw=.9, zorder=2))
     ax.imshow(img, cmap="gray_r", extent=[6, 24, 30, 48], zorder=3)
     ax.add_patch(Rectangle((6, 30), 18, 18, fill=False, ec=INK, lw=1.2, zorder=4))
-    ax.text(15, 55.0, "INPUT", ha="center", fontsize=10.5, weight="bold")
-    ax.text(15, 52.2, "a batch of 256", ha="center", fontsize=8.8, color=ACC)
-    dims(15, 28.5, "(256, 1, 28, 28)")
+    ax.text(15, 56.4, "INPUT", ha="center", fontsize=10.5, weight="bold")
+    ax.text(15, 53.4, f"one batch = {BS} images", ha="center", fontsize=8.8,
+            color=ACC, weight="bold")
+    dims(15, 28.5, f"({BS}, 1, 28, 28)")
 
     # 2 ---------------- 16 patches
     for r in range(4):
@@ -616,11 +620,14 @@ def draw_architecture(d, path="architecture.png"):
     ax.text(188, 53.5, "OUTPUT", ha="center", fontsize=10.5, weight="bold")
     dims(188, 22.0, "Linear(64, 10)\n-> softmax")
 
-    ax.text(99, 17.4, "Drawn for ONE image. Every tensor really carries a leading BATCH "
+    ax.text(99, 18.6, "Drawn for ONE image. Every tensor really carries a leading BATCH "
             "axis \u2014 (256, 17, 64), not (17, 64).", ha="center", fontsize=9.4, color=INK)
-    ax.text(99, 14.6, "The 256 ride through together \u2014 but never interact: attention mixes "
+    ax.text(99, 16.0, "The 256 ride through together \u2014 but never interact: attention mixes "
             "tokens WITHIN one image, so there are 256 separate 17x17 matrices.",
             ha="center", fontsize=9.4, color=GRY)
+    ax.text(99, 13.4, f"Training set {N:,} images  =  {NB-1} x {BS} + {N - (NB-1)*BS}  "
+            f"\u2192  {NB} batches per epoch  x  {EP} epochs  =  {NB*EP:,} weight updates.",
+            ha="center", fontsize=9.4, color=ACC, weight="bold")
 
     fig.savefig(path, dpi=140, bbox_inches="tight")
     print(f"  wrote {path}")
