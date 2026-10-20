@@ -22,6 +22,10 @@ shape from a live tensor, so it cannot drift from the code. It is the fastest wa
 the 17x17 attention matrix is the only place information crosses between positions, and that
 the block shape `(B, 17, 64)` never changes, which is why blocks stack.
 
+`draw_flow()` is that same trace as a diagram: the whole path down the left, one block opened
+up on the right, with the 17x17 attention matrix marked as the only step where information
+crosses between positions.
+
 `show_training()` opens up the loop that `exp_train` hides: every one of the 1 410 gradient
 steps, not just the six epoch-end printouts, plus what cross-entropy actually measures on a
 single digit (`p(7)` 0.077 → 0.998, loss 2.56 → 0.00). It also explains why the printed loss

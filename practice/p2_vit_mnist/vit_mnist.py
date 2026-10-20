@@ -393,6 +393,124 @@ def trace_shapes(d, bs=256):
     return m
 
 
+def draw_flow(path="shape_flow.png", bs=256):
+    """The same trace as trace_shapes(), drawn.
+
+    Left column: the path a batch takes. Right: one block opened up. The
+    shapes are the ones trace_shapes() prints from live tensors.
+    """
+    from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+    T1, hd = NP + 1, D // HEADS
+    INK, ACC, BLU, GRY = "#212529", "#e8590c", "#1c7ed6", "#868e96"
+
+    fig, ax = plt.subplots(figsize=(16.6, 9.7))
+    ax.set_xlim(0, 124); ax.set_ylim(0, 91); ax.axis("off"); ax.invert_yaxis()
+
+    def box(x, y, w, h, label, shape, note="", fc="#f8f9fa", ec=INK, lw=1.1, fs=10):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.6,rounding_size=1.2",
+                                    fc=fc, ec=ec, lw=lw, zorder=3))
+        ax.text(x + 1.6, y + h/2, label, va="center", ha="left", fontsize=fs,
+                zorder=4, color=INK)
+        ax.text(x + w - 1.6, y + h/2, shape, va="center", ha="right", fontsize=fs,
+                family="monospace", zorder=4, color=BLU)
+        if note:
+            ax.text(x + w + 1.4, y + h/2, note, va="center", ha="left", fontsize=8.6, color=GRY)
+
+    def arrow(x, y0, y1, label="", color=INK, lw=1.2):
+        ax.add_patch(FancyArrowPatch((x, y0), (x, y1), arrowstyle="-|>", mutation_scale=11,
+                                     lw=lw, color=color, zorder=2))
+        if label:
+            ax.text(x + 1.2, (y0 + y1) / 2, label, va="center", ha="left",
+                    fontsize=8.8, color=color, style="italic")
+
+    # ---------------- left column: the whole path
+    LX, LW, H = 4, 40, 4.6
+    ax.text(LX, 2.4, "ONE BATCH, END TO END", fontsize=11.5, weight="bold", color=INK)
+    steps = [
+        ("input images",       f"({bs}, 1, 28, 28)", "784 pixels each",        "#fff4e6"),
+        ("Conv2d(1,64,k=7,s=7)", f"({bs}, 64, 4, 4)", "still a GRID",          "#f8f9fa"),
+        ("flatten + transpose", f"({bs}, {NP}, {D})", "now a SEQUENCE",        "#e7f5ff"),
+        (f"prepend [CLS] + position", f"({bs}, {T1}, {D})", f"{NP}+1 tokens",  "#e7f5ff"),
+    ]
+    y = 6
+    for i, (lab, sh, note, fc) in enumerate(steps):
+        box(LX, y, LW, H, lab, sh, note, fc=fc)
+        if i < len(steps) - 1:
+            arrow(LX + LW/2, y + H, y + H + 4.2)
+        y += H + 4.2
+    y_block_in = y
+
+    y -= 1.8
+    ax.add_patch(FancyBboxPatch((LX - 1.2, y + 3.4), LW + 2.4, 13.5,
+                                boxstyle="round,pad=0.6,rounding_size=1.4",
+                                fc="#fff9db", ec=ACC, lw=1.8, zorder=3))
+    ax.text(LX + LW/2, y + 7.2, f"{LAYERS} x  TRANSFORMER BLOCK", ha="center",
+            fontsize=11, weight="bold", color=ACC, zorder=4)
+    ax.text(LX + LW/2, y + 11.8, f"({bs}, {T1}, {D})  in   \u2192   ({bs}, {T1}, {D})  out",
+            ha="center", fontsize=9.6, family="monospace", color=GRY, zorder=4)
+    ax.text(LX + LW/2, y + 15.0, "shape never changes \u2014 which is why they stack",
+            ha="center", fontsize=8.8, color=GRY, style="italic", zorder=4)
+    arrow(LX + LW/2, y, y + 3.4)
+    y += 13.5 + 3.4 + 4.2
+
+    tail = [
+        ("LayerNorm, take row 0", f"({bs}, {D})",  f"other {NP} tokens dropped", "#e7f5ff"),
+        ("Linear(64,10)",         f"({bs}, 10)",   "one score per class",        "#f8f9fa"),
+        ("cross_entropy(., y)",   "scalar",        "ONE number",                 "#ffe3e3"),
+    ]
+    for i, (lab, sh, note, fc) in enumerate(tail):
+        arrow(LX + LW/2, y - 4.2, y)
+        box(LX, y, LW, H, lab, sh, note, fc=fc)
+        y += H + 4.2
+
+    # backward
+    bx = LX - 3.2
+    ax.plot([bx, bx], [10.5, y - 4.2 + H / 2], color=ACC, lw=1.5, ls=(0, (5, 3)), zorder=2)
+    ax.add_patch(FancyArrowPatch((bx, 14), (bx, 8.6), arrowstyle="-|>", mutation_scale=13,
+                                 lw=1.5, color=ACC, zorder=2))
+    ax.text(bx - 1.8, (y + 8.5) / 2,
+            "loss.backward()\nfills .grad on every\nparameter \u2014 52 tensors,\n204,298 numbers,\neach the SAME shape\nas its parameter\n\nopt.step() then nudges\nevery one downhill",
+            ha="right", va="center", fontsize=9, color=ACC, linespacing=1.65)
+
+    # ---------------- right column: inside one block
+    RX, RW = 64, 34
+    ax.text(RX, 2.4, "INSIDE ONE BLOCK", fontsize=11.5, weight="bold", color=ACC)
+    ax.add_patch(FancyBboxPatch((RX - 2.6, 5.0), RW + 11.5, 76.5,
+                                boxstyle="round,pad=0.6,rounding_size=1.4",
+                                fc="#fffdf5", ec=ACC, lw=1.4, zorder=1))
+    inner = [
+        ("LayerNorm",            f"({bs}, {T1}, {D})",            "", "#f8f9fa"),
+        ("Linear(64,192)",       f"({bs}, {T1}, {3*D})",          "= 3 x 64", "#f8f9fa"),
+        ("chunk \u2192 q, k, v",     f"({bs}, {T1}, {D})",            "each", "#f8f9fa"),
+        (f"split into {HEADS} heads",  f"({bs}, {HEADS}, {T1}, {hd})",  f"{HEADS}x{hd}={D}", "#e7f5ff"),
+        ("q @ k\u1d40 / \u221ad",        f"({bs}, {HEADS}, {T1}, {T1})",  "the attention matrix", "#ffe8cc"),
+        ("softmax(dim=-1)",      f"({bs}, {HEADS}, {T1}, {T1})",  "rows sum to 1", "#ffe8cc"),
+        ("@ v",                  f"({bs}, {HEADS}, {T1}, {hd})",  "weighted average", "#e7f5ff"),
+        ("merge heads",          f"({bs}, {T1}, {D})",            "", "#e7f5ff"),
+        ("Linear(64,64) = W\u1d3c",  f"({bs}, {T1}, {D})",            "", "#f8f9fa"),
+        ("x + attn(.)",          f"({bs}, {T1}, {D})",            "RESIDUAL", "#d3f9d8"),
+        ("x + mlp(norm(x))",     f"({bs}, {T1}, {D})",            "64\u2192256\u219264, per token", "#d3f9d8"),
+    ]
+    yy, HH = 8.0, 4.3
+    for i, (lab, sh, note, fc) in enumerate(inner):
+        box(RX, yy, RW, HH, lab, sh, note, fc=fc, fs=9.4,
+            ec=ACC if fc == "#ffe8cc" else INK, lw=1.6 if fc == "#ffe8cc" else 1.0)
+        if i < len(inner) - 1:
+            arrow(RX + RW/2, yy + HH, yy + HH + 2.3, lw=.9, color=GRY)
+        yy += HH + 2.3
+
+    ax.annotate("", xy=(RX - 3.0, 30), xytext=(LX + LW + 9, y_block_in + 9),
+                arrowprops=dict(arrowstyle="-", color=ACC, lw=1.1, ls=(0, (4, 3)),
+                                connectionstyle="arc3,rad=-0.12"))
+    ax.text(RX + RW + 14.5, 30.5,
+            "the ONLY step where\ninformation crosses\nbetween positions \u2014\neverything else works\non one token at a time",
+            fontsize=9.2, color=ACC, va="center", linespacing=1.65)
+
+    fig.savefig(path, dpi=140, bbox_inches="tight")
+    print(f"  wrote {path}")
+    return path
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own
