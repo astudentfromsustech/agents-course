@@ -50,6 +50,14 @@ inner dimensions meet at 16 and the result is `17x17` rather than `16x16` — th
 content into scores. `A' @ V` reverses it, back to `(4,17,16)`. The four `(64,64)` matrices are
 the block's attention parameters: 4 x 4,096 = 16,384 of its 49,792, the rest being the MLP.
 
+`conv_or_not()` addresses the obvious objection to `Conv2d`/`kernel_size`/`stride` appearing in a
+transformer. It rebuilds PatchEmbed with no convolution — `unfold` then matmul — and the outputs
+are **bit-identical** (max difference 0.00). The Conv2d is a fused GPU kernel doing the cutting
+and the matmul in one call, nothing more. Of the three things that make a CNN a CNN — shared
+weights, overlapping receptive fields, a hierarchy of growing fields — this layer has only the
+first, and shared weights are no more convolutional than one embedding table serving all word
+positions. The locality prior `exp_scale` measures comes from overlap and stacking, both absent.
+
 `does_multihead_help()` asks whether multi-head beats single-head, which changing `HEADS` tests
 cleanly since it adds **no parameters**. Across 5 seeds: 1 head 94.73 %, 4 heads 95.34 % —
 **+0.61 points, se 0.25, distinguishable**. Real but small. (A 3-seed version of the same test

@@ -1450,6 +1450,52 @@ def does_multihead_help(d, heads=(1, 4), seeds=5, epochs=6):
     return out
 
 
+def conv_or_not(d, n=8):
+    """Is PatchEmbed really a convolution? It uses Conv2d, but k == s.
+
+    Rebuilds the same layer with NO convolution -- cut, flatten, matmul -- and
+    compares. If the two agree exactly, the Conv2d is an implementation detail
+    and not a convolutional inductive bias.
+    """
+    m = trained(d)
+    (_, _), (Xte, _) = d
+    G = IMG // PATCH
+    x = Xte[:n]
+
+    with torch.no_grad():
+        via_conv = m.patch(x)
+
+    W = m.patch.proj.weight.reshape(D, -1)          # (D, PATCH*PATCH)
+    b = m.patch.proj.bias
+    patches = (x.squeeze(1)
+                .unfold(1, PATCH, PATCH).unfold(2, PATCH, PATCH)
+                .reshape(x.shape[0], G * G, PATCH * PATCH))
+    with torch.no_grad():
+        via_matmul = patches @ W.T + b
+
+    same = torch.allclose(via_conv, via_matmul, atol=1e-5)
+    diff = float((via_conv - via_matmul).abs().max())
+    print(f"  k = s = {PATCH}, so the window never overlaps. Does the Conv2d do anything")
+    print(f"  a plain matmul could not?\n")
+    print(f"    Conv2d(1,{D},k={PATCH},s={PATCH})        {tuple(via_conv.shape)}")
+    print(f"    unfold -> reshape -> @ W.T + b   {tuple(via_matmul.shape)}")
+    print(f"    identical?  {same}    max difference {diff:.2e}\n")
+    print(f"  No. The Conv2d is a fused, GPU-optimised way to do the cutting and the")
+    print(f"  matmul in one call. Written out it is just:\n")
+    print(f"    patches = x.unfold(1,{PATCH},{PATCH}).unfold(2,{PATCH},{PATCH}).reshape(B,{G*G},{PATCH*PATCH})")
+    print(f"    tokens  = patches @ W.T + b\n")
+    print(f"  What makes a CNN a CNN, and what this layer has:\n")
+    print(f"    weights shared across positions   YES  one W for all {G*G} patches")
+    print(f"    OVERLAPPING receptive fields      no   k = s")
+    print(f"    HIERARCHY of growing fields       no   one layer, then attention\n")
+    print(f"  The locality PRIOR -- the thing exp_scale() measures as worth 19 points")
+    print(f"  at N=1,000 -- comes from overlap and stacking. Strip those and you have")
+    print(f"  a lookup table applied blockwise. And the weight sharing is not")
+    print(f"  convolutional either: one W for all patches is the same arrangement as")
+    print(f"  one embedding table for all word positions.")
+    return same
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own
