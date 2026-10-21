@@ -220,6 +220,53 @@
     <p>The blocks are identical in all three. Everything that distinguishes them is <b>what may attend to what, and what the model is asked to predict.</b></p>
   </div>
 
+  <h4 id="s-n-vectors-out-one-answer-needed">n vectors out, one answer needed</h4>
+
+  <p>That first bullet hides a problem. An encoder maps <i>n</i> vectors to <i>n</i> vectors — but
+  classification needs <b>one</b>. Something has to collapse the sequence, and the architecture does
+  not say what.</p>
+
+  <p>BERT's answer was to <b>prepend a token</b>. A learned vector, <code>[CLS]</code>, is pushed onto
+  the front of the sequence; it carries no input content, but it has its own query, so it can read
+  from every real token across every layer. Its final vector is handed to the classifier and the
+  other <i>n</i> are discarded. ViT copied the device wholesale — the paper says so plainly:</p>
+
+  <div class="note">
+    <p>“Similar to BERT's <code>[class]</code> token, we prepend a learnable embedding to the
+    sequence of embedded patches.”<br>
+    <span class="cm">— Dosovitskiy et al., <i>An Image is Worth 16x16 Words</i>, §3.1</span></p>
+  </div>
+
+  <p>The argument for it is reasonable: the obvious alternative, averaging the <i>n</i> outputs, is a
+  <b>fixed and unweighted</b> summary — every position counts the same, including the ones carrying
+  nothing. A <code>[CLS]</code> token can instead <i>learn what to ask for</i>, recomputed per input.</p>
+
+  <div class="warn">
+    <p><b>Except it does not measurably help.</b> The same paper's appendix compares the token
+    against global average pooling and concludes: “<i>Both work similarly well, but require different
+    learning-rates</i>” — the gap it first saw was <b>fully explained by the learning rate</b>, not by
+    the read-out.</p>
+    <p><a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p2_vit_mnist/vit_mnist.ipynb">Practice p2</a> reproduces that. One model, one budget, three
+    read-outs:</p>
+    <div class="tw" style="margin:12px 0"><table>
+      <thead><tr><th>read-out</th><th>parameters</th><th>test accuracy</th></tr></thead>
+      <tbody>
+        <tr><td><code>[CLS]</code> token</td><td>204,298</td><td>95.24 %</td></tr>
+        <tr><td>mean-pool</td><td>204,234</td><td><b>95.62 %</b></td></tr>
+        <tr><td>max-pool</td><td>204,234</td><td><b>95.96 %</b></td></tr>
+      </tbody>
+    </table></div>
+    <p>Single runs at one seed, so read that as <i>no meaningful difference</i> rather than
+    “pooling wins”. The point stands either way: <b><code>[CLS]</code> is a convention, not a
+    requirement.</b> It survives because BERT did it and ViT wanted to stay close to the original
+    transformer; plenty of current vision models drop it for average pooling.</p>
+  </div>
+
+  <p>Worth noticing <i>why</i> it can be dispensed with. The practice measures the token's learned
+  64 numbers and finds they barely move from their zero initialisation — it is an <b>empty slot with
+  a query attached</b>, filled entirely by what attention pulls in. And once you see that, an average
+  over the real tokens is obviously a reasonable substitute for it.</p>
+
   <h3 id="s-the-decoder-how-a-sequence-gets-produced">The decoder: how a sequence gets produced</h3>
 
   <p>The encoder's job was easy to state — <i>n</i> vectors in, <i>n</i> vectors out. The decoder's job is harder, because it has to invent a sequence whose length nobody told it.</p>
