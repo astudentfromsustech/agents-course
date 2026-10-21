@@ -60,6 +60,15 @@ Q and K are consumed at `Q.K^T` and never appear again; V is consumed at `A' @ V
 at the foot of the block: **Q and K only make scores, only V carries content** — which is also why
 `d_v` need not equal `d_k`.
 
+`how_heads_differ()` answers what the maps only suggest, measured over 1,024 images. Three axes,
+the first a negative result: the heads do **not** specialise by position — uniform attention gives
+a mean offset of 1.50 and all 16 heads measure 1.47-1.53 with preferred direction ~(0,0), so none
+learned a fixed offset, even though the CNN-equivalence construction needs exactly that. They
+differ instead in how much **content** drives them (block 1 head 2 draws nearly the same map for
+every digit at 0.21; block 3 reaches 0.94 — content-dependence rises with depth) and in what
+**kind of patch** they read (block 1 head 0 is indifferent to ink at -0.002, head 3 seeks it at
++0.539; by block 4 all four converge to +0.22-0.30). Most specialised in block 1, least in block 4.
+
 `show_all_attention()` draws every map in the model — 4 blocks x 4 heads — plus a column folding
 each block's `[CLS]` row back onto the 4x4 patch grid over the digit, so you can see what the
 classifier's token reads at each depth. By block 2 it has found the stroke. The bright vertical

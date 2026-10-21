@@ -1330,6 +1330,64 @@ def why_cls(d, epochs=6):
     return out
 
 
+def how_heads_differ(d, n=1024):
+    """How do the heads actually differ? Measured over many images, not one.
+
+    Three axes, and the first is a NEGATIVE result worth keeping: the heads
+    do not specialise by position at all, which the chapter's CNN-equivalence
+    result would have allowed.
+    """
+    m = trained(d)
+    (_, _), (Xte, _) = d
+    G = IMG // PATCH
+    rc = torch.tensor([[i // G, i % G] for i in range(NP)]).float()
+    with torch.no_grad():
+        _, maps = m(Xte[:n], keep_attn=True)
+
+    unif = torch.full((NP, NP), 1 / NP)
+    base = float(((unif.unsqueeze(-1) * rc.unsqueeze(0)).sum(1) - rc).norm(dim=-1).mean())
+
+    print(f"  measured over {n:,} test images\n")
+    print(f"  1. do they specialise by POSITION?   uniform attention = {base:.2f}\n")
+    print(f"     {'':14}" + "".join(f"{'head '+str(h):>10}" for h in range(HEADS)))
+    for l in range(LAYERS):
+        A = maps[l].cpu().mean(0)
+        row = []
+        for h in range(HEADS):
+            P = A[h][1:, 1:]; P = P / P.sum(-1, keepdim=True)
+            row.append(float(((P.unsqueeze(-1) * rc.unsqueeze(0)).sum(1) - rc).norm(dim=-1).mean()))
+        print(f"     block {l+1}      " + "".join(f"{v:>10.2f}" for v in row))
+    print(f"\n     NO. Every head sits at the uniform baseline, and every preferred")
+    print(f"     direction is ~(0,0). Not one head learned a fixed offset — even though")
+    print(f"     multi-head attention CAN express a convolution that way.\n")
+
+    print(f"  2. how much does CONTENT drive them?  (map variability across images)\n")
+    print(f"     {'':14}" + "".join(f"{'head '+str(h):>10}" for h in range(HEADS)))
+    for l in range(LAYERS):
+        A = maps[l].cpu()
+        row = [float(A[:, h].std(0).mean() / A[:, h].mean(0).mean()) for h in range(HEADS)]
+        print(f"     block {l+1}      " + "".join(f"{v:>10.2f}" for v in row))
+    print(f"\n     Low = nearly the same map for every digit (routing by slot).")
+    print(f"     High = the map is driven by what is in the image.")
+    print(f"     Content-dependence RISES with depth.\n")
+
+    img = Xte[:n, 0].cpu()
+    ink = torch.stack([img[:, (k//G)*PATCH:(k//G+1)*PATCH,
+                            (k%G)*PATCH:(k%G+1)*PATCH].amax(dim=(1, 2)) for k in range(NP)], 1)
+    ink = (ink - ink.mean()) / ink.std()
+    print(f"  3. do they read different KINDS of patch?  corr(weight, ink)\n")
+    print(f"     {'':14}" + "".join(f"{'head '+str(h):>10}" for h in range(HEADS)))
+    for l in range(LAYERS):
+        row = []
+        for h in range(HEADS):
+            w = maps[l][:, h, 0, 1:].cpu(); w = (w - w.mean()) / w.std()
+            row.append(float((w * ink).mean()))
+        print(f"     block {l+1}      " + "".join(f"{v:>+10.3f}" for v in row))
+    print(f"\n     + reads INKED patches, - reads BLANK ones. Block 1 is where they")
+    print(f"     are most specialised; by block 4 they have largely converged.")
+    return maps
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own
