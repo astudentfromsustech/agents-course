@@ -1496,6 +1496,106 @@ def conv_or_not(d, n=8):
     return same
 
 
+def predict(d, img_i=0, path="prediction.png"):
+    """One image, end to end, with every stage drawn — finishing in the answer.
+
+    pixels -> patches -> tokens -> what [CLS] reads at each block ->
+    the final 64-d vector -> 10 logits -> softmax -> the predicted digit.
+    """
+    m = trained(d)
+    (_, _), (Xte, Yte) = d
+    G, T1 = IMG // PATCH, NP + 1
+    x = Xte[img_i:img_i+1]
+    img = x[0, 0].cpu()
+    truth = int(Yte[img_i])
+
+    with torch.no_grad():
+        tok = m.patch(x)                                   # (1, NP, D)
+        t = torch.cat([m.cls.expand(1, -1, -1), tok], 1) + m.pos
+        cls_per_block = []
+        for b in m.blocks:
+            t, a = b(t, True)
+            cls_per_block.append(a[0][:, 0, 1:].mean(0).reshape(G, G).cpu())
+        final = m.norm(t)[:, 0]
+        logits = m.head(final)[0].cpu()
+        probs = logits.softmax(-1)
+    pred = int(logits.argmax())
+
+    fig = plt.figure(figsize=(15.5, 8.6))
+    gs = fig.add_gridspec(3, 6, height_ratios=[1.15, .92, 1.05],
+                          hspace=.52, wspace=.42)
+
+    ax = fig.add_subplot(gs[0, 0])                          # 1 the image
+    ax.imshow(img, cmap="gray"); ax.set_xticks([]); ax.set_yticks([])
+    ax.set_title(f"1. input\n28x28 px", fontsize=10)
+
+    ax = fig.add_subplot(gs[0, 1])                          # 2 the patches
+    ax.imshow(img, cmap="gray")
+    for k in range(1, G):
+        ax.axhline(k*PATCH - .5, color="#e8590c", lw=1.3)
+        ax.axvline(k*PATCH - .5, color="#e8590c", lw=1.3)
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_title(f"2. {NP} patches\n{PATCH}x{PATCH} each", fontsize=10)
+
+    ax = fig.add_subplot(gs[0, 2:4])                        # 3 the tokens
+    seq = t[0].detach().cpu()
+    v = float(seq.abs().max())
+    ax.imshow(seq, cmap="RdBu_r", vmin=-v, vmax=v, aspect="auto")
+    ax.set_yticks([0]); ax.set_yticklabels(["[CLS]"], fontsize=8)
+    ax.tick_params(labelsize=7.5)
+    ax.set_title(f"3. tokens after the blocks   ({T1} x {D})", fontsize=10)
+    ax.set_xlabel("d_model", fontsize=8.5)
+
+    ax = fig.add_subplot(gs[0, 4:])                         # 4 the final vector
+    ax.bar(range(D), final[0].detach().cpu(), color="#1c7ed6", width=1.0)
+    ax.set_title(f"4. row 0 only — the [CLS] vector ({D} numbers)", fontsize=10)
+    ax.set_xlabel("dimension", fontsize=8.5); ax.tick_params(labelsize=7.5)
+    for s_ in ("top", "right"): ax.spines[s_].set_visible(False)
+
+    for bi, cmap_ in enumerate(cls_per_block):              # 5 what CLS read
+        ax = fig.add_subplot(gs[1, bi])
+        ax.imshow(img, cmap="gray", alpha=.45, extent=[-.5, G-.5, G-.5, -.5])
+        ax.imshow(cmap_, cmap="magma", alpha=.75)
+        ax.set_xticks([]); ax.set_yticks([])
+        ax.set_title(f"block {bi+1}", fontsize=9.5)
+    fig.text(.088, .615, "5. what [CLS] reads, block by block",
+             fontsize=10, ha="left")
+
+    ax = fig.add_subplot(gs[1, 4:])                         # 6 the logits
+    ax.bar(range(10), logits, color="#adb5bd")
+    ax.bar([pred], [logits[pred]], color="#e8590c")
+    ax.set_xticks(range(10)); ax.tick_params(labelsize=8)
+    ax.set_title(f"6. Linear({D}, 10) -> logits", fontsize=10)
+    for s_ in ("top", "right"): ax.spines[s_].set_visible(False)
+
+    ax = fig.add_subplot(gs[2, :3])                         # 7 probabilities
+    ax.bar(range(10), probs, color="#adb5bd")
+    ax.bar([pred], [probs[pred]], color="#e8590c")
+    ax.set_xticks(range(10)); ax.set_ylim(0, 1); ax.tick_params(labelsize=8)
+    ax.set_title("7. softmax -> probabilities", fontsize=10)
+    ax.set_xlabel("digit class", fontsize=8.5)
+    for s_ in ("top", "right"): ax.spines[s_].set_visible(False)
+
+    ax = fig.add_subplot(gs[2, 3:]); ax.axis("off")         # 8 the answer
+    ok = pred == truth
+    ax.text(.02, .88, "8. the answer", fontsize=11, weight="bold")
+    ax.text(.02, .50, f"predicted  {pred}", fontsize=27, weight="bold",
+            color="#2f9e44" if ok else "#c92a2a")
+    ax.text(.52, .62, f"true label   {truth}", fontsize=12.5, color="#495057")
+    ax.text(.52, .50, f"confidence   {float(probs[pred]):.1%}", fontsize=12.5, color="#495057")
+    runner = int(probs.argsort(descending=True)[1])
+    ax.text(.52, .38, f"runner-up    {runner} at {float(probs[runner]):.1%}",
+            fontsize=12.5, color="#868e96")
+    ax.text(.02, .14, f"the whole image became {D} numbers, then 10, then one.",
+            fontsize=10, color="#868e96", style="italic")
+
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  wrote {path}   predicted {pred}, true {truth}, "
+          f"confidence {float(probs[pred]):.1%}")
+    return pred
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

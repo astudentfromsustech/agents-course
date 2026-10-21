@@ -21,5 +21,7 @@ practice/*/tokens.png
 practice/*/filters.png
 practice/*/qkv_heads.png
 practice/*/attention_all_layers.png
+practice/*/prediction.png
+practice/*/prediction_wrong.png
 practice/**/mnist.npz
 practice/**/data/

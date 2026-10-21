@@ -202,6 +202,15 @@ related, and the more data it gets the less that costs it.
 > the ViT paper happens somewhere past 100 M images. What a laptop can show you is the
 > *slope*: the prior paying off less and less. That slope is the whole argument.
 
+## 5 · One image, end to end
+
+`predict()` draws the whole journey for a single digit in eight panels: input, the 16 patches,
+the token matrix, the final `[CLS]` vector, what `[CLS]` reads at each block, the 10 logits, the
+softmax, and the answer. Run it on a failure too — `V.predict(d, img_i=18)` shows a loopy `3`
+called a `5` at 92.6 % confidence, with `3` not even the runner-up. Worth seeing, because a high
+softmax probability means *far from the decision boundary*, not *likely correct*; nothing in the
+architecture measures its own uncertainty.
+
 ## Things worth trying
 
 - Change `PATCH` to 4 (49 tokens) or 14 (4 tokens). Where does accuracy break, and is the
