@@ -909,7 +909,7 @@ def show_filters(d, epochs=6, path="filters.png"):
     fig.savefig(path, dpi=140, bbox_inches="tight")
     plt.close(fig)
     print(f"  wrote {path}  (cosine {cos:.4f}, test {acc1*100:.2f}%)")
-    return cos
+    return path          # every figure function returns its path, so display(Image(...)) works
 
 
 
