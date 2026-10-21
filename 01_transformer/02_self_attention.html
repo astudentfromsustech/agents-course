@@ -658,6 +658,50 @@ two heads   head 1  α′ = [ 1.0 subject    ] → b¹ = v<sub>subject</sub>
         <p><b>Heads split the width, they don't add to it.</b> The intuitive worry is that 32 heads cost 32× — they don't. With <code>d_model = 4096</code> and 32 heads, each head works in <code>d_k = 128</code>, and <code>32 × 128 = 4096</code>: the same total dimension, <b>partitioned</b> rather than duplicated. Parameters and FLOPs are essentially unchanged from one wide head. What you get for free is <b>independence</b> — 32 separate score matrices that can specialize, instead of one that must compromise. That is close to the best trade in the architecture, and it's why every model uses many heads.</p>
   </div>
 
+  <h4 id="s-how-much-does-multi-head-actually-buy">How much does it actually buy?</h4>
+
+  <p>The budget argument above says multi-head <i>should</i> help. It is worth asking by how much,
+  because the answer is "it depends on the task" far more than the argument suggests — and because
+  the head count is an unusually clean thing to test: changing it adds <b>no parameters at all</b>.
+  <code>W<sup>q</sup></code> is the same <code>d_model × d_model</code> matrix either way; the heads
+  are a reshape of its columns, not extra weights.</p>
+
+  <div class="tryit">
+    <p><b>Measured.</b> <a target="_blank" rel="noopener noreferrer" href="https://colab.research.google.com/github/astudentfromsustech/agents-course/blob/main/practice/p2_vit_mnist/vit_mnist.ipynb">Practice p2</a> trains the same ViT with
+    <code>HEADS = 1</code> and <code>HEADS = 4</code>, five seeds each:</p>
+    <div class="tw" style="margin:12px 0"><table>
+      <thead><tr><th>heads</th><th>dim/head</th><th>parameters</th><th>test accuracy</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>64</td><td>204,298</td><td>94.73 % <span class="cm">± 0.38</span></td></tr>
+        <tr><td>4</td><td>16</td><td>204,298</td><td><b>95.34 %</b> <span class="cm">± 0.40</span></td></tr>
+      </tbody>
+    </table></div>
+    <p><b>+0.61 points, se 0.25</b> — real, at about 2.4 standard errors, and <i>small</i>.</p>
+  </div>
+
+  <div class="warn">
+    <p><b>Small enough that a sloppy test gets the wrong answer.</b> The same comparison at three
+    seeds reports "not distinguishable" (1.7 se). A single run is worse: one seed had <b>2 heads
+    beating 4, and 16 beating 8</b> — a non-monotonic ordering that is pure noise. Any claim of the
+    form "architecture X beats Y by half a point" needs several seeds before it means anything.</p>
+  </div>
+
+  <p><b>Why so small there, and much larger elsewhere?</b> Re-read what the budget argument actually
+  requires: it bites only when a position has <i>several relations to track at once</i>. On MNIST
+  the task is close to "where is the ink", so one notion of relevance nearly suffices and the budget
+  rarely binds. In language a single token routinely needs its subject <i>and</i> its antecedent
+  <i>and</i> its syntactic head simultaneously — which is the situation the argument describes, and
+  where the gap is correspondingly wide.</p>
+
+  <div class="note">
+    <p><b>The same practice shows the mechanism behind that.</b> Measuring all 16 heads over 1,024
+    images, the four heads are most differentiated in the <i>first</i> block — one ignores ink
+    entirely (correlation &minus;0.002 with patch ink), another chases it (+0.539) — and have largely
+    <b>converged by the last</b> (+0.22 to +0.30, all doing much the same thing). When one relation
+    suffices, four heads have little to divide between them. That is the budget argument running in
+    reverse, and it is visible in the weights.</p>
+  </div>
+
   <h3 id="s-what-the-attention-scores-are">What the attention scores are</h3>
 
   <p>Inside the forward pass the attention matrix has exactly one job, and naming it precisely is
