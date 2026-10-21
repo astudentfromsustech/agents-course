@@ -43,6 +43,15 @@ x + attn(x)                        residual
 x + MLP(x)                         64->256->64, per token
 ```
 
+Each of Q, K, V now carries its own equation — `Q = x @ Wq` with `Wq` a learned `(64, 64)` —
+rather than being lumped on one line.
+
+`split_heads()` answers what "split into 4 heads" does: **nothing**. It is a reshape. Head *h* is
+literally dimensions `[16h : 16h+16]` of the same vector — same numbers, same storage, no
+parameters, not one multiply. The multi-headedness lives in `Wq`/`Wk`/`Wv`, which training is
+free to make compute something different per column block; the split only declares the
+boundaries.
+
 Q and K are consumed at `Q.K^T` and never appear again; V is consumed at `A' @ V`. Hence the line
 at the foot of the block: **Q and K only make scores, only V carries content** — which is also why
 `d_v` need not equal `d_k`.

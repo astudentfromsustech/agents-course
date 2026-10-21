@@ -678,17 +678,19 @@ def draw_architecture(d, path="architecture.png"):
             ha="center", fontsize=8.4, color=GRY, style="italic")
 
     rows = [
-        ("x",                       f"({NP+1}, {D})",             "what arrives",                      INK),
-        ("\u2193  W\u1d60  W\u1d4f  W\u1d5b",      f"3 x ({D}, {D})",            "learned",                           GRY),
-        ("Q   K   V",               f"each ({NP+1}, {D})",        f"split into {HEADS} HEADS of {hd}", "#1c7ed6"),
-        (f"\u2193  Q \u00b7 K\u1d40 / \u221a{hd}",   f"A   ({HEADS}, {NP+1}, {NP+1})", f"<- Q,K used HERE;  {HEADS} = heads",              ACC),
-        ("\u2193  softmax",            "A'  same shape",             "each row sums to 1",                GRY),
-        ("\u2193  A' @ V",             f"({HEADS}, {NP+1}, {hd})",   "<- V used HERE",                    ACC),
-        ("\u2193  merge + W\u1d3c",       f"({NP+1}, {D})",             f"({D}, {D}) learned",               GRY),
-        ("x + attn(x)",             f"({NP+1}, {D})",             "residual",                          "#2f9e44"),
-        ("x + MLP(x)",              f"({NP+1}, {D})",             f"{D}->{4*D}->{D}, per token",       "#2f9e44"),
+        ("x",                      f"({NP+1}, {D})",            "what arrives",                INK),
+        ("Q = x @ W\u1d60",            f"({NP+1}, {D})",            f"W\u1d60 is ({D}, {D}), learned",  "#1c7ed6"),
+        ("K = x @ W\u1d4f",            f"({NP+1}, {D})",            f"W\u1d4f is ({D}, {D}), learned",  "#1c7ed6"),
+        ("V = x @ W\u1d5b",            f"({NP+1}, {D})",            f"W\u1d5b is ({D}, {D}), learned",  "#1c7ed6"),
+        (f"\u2193  split into {HEADS} heads", f"({HEADS}, {NP+1}, {hd})",  "a RESHAPE - no maths",        GRY),
+        (f"\u2193  Q @ K\u1d40 / \u221a{hd}",    f"A  ({HEADS}, {NP+1}, {NP+1})", "<- Q,K used HERE",            ACC),
+        ("\u2193  softmax",            "A'  same shape",            "each row sums to 1",          GRY),
+        ("\u2193  A' @ V",             f"({HEADS}, {NP+1}, {hd})",  "<- V used HERE",              ACC),
+        ("\u2193  merge @ W\u1d3c",       f"({NP+1}, {D})",            f"W\u1d3c is ({D}, {D}), learned",  GRY),
+        ("x + attn(x)",            f"({NP+1}, {D})",            "residual",                    "#2f9e44"),
+        ("x + MLP(x)",             f"({NP+1}, {D})",            f"{D}->{4*D}->{D}, per token", "#2f9e44"),
     ]
-    yy = 53.0
+    yy = 53.4
     for lab, shp, note, col in rows:
         ax.text(BX + 1.6, yy, lab, va="center", ha="left", fontsize=7.8, color=col,
                 weight="bold" if col in (ACC, "#2f9e44", "#1c7ed6") else "normal")
@@ -696,9 +698,9 @@ def draw_architecture(d, path="architecture.png"):
                 family="monospace", color="#1c7ed6")
         ax.text(BX + 34.0, yy, note, va="center", ha="left", fontsize=7.0,
                 color=ACC if note.startswith("<-") else GRY)
-        yy -= 3.35
+        yy -= 2.82
 
-    ax.text(BX + BW/2, 22.4, "Q and K only make SCORES.  Only V carries content.",
+    ax.text(BX + BW/2, 21.7, "Q and K only make SCORES.  Only V carries content.",
             ha="center", fontsize=8.0, color=ACC, style="italic")
     ax.text(BX + BW/2, 17.8, f"learned: {grp['blocks']:,}  ({grp['blocks']//LAYERS:,} x {LAYERS})",
             ha="center", fontsize=9, color=ACC, weight="bold")
@@ -1236,6 +1238,40 @@ def show_all_attention(d, img_i=0, path="attention_all_layers.png"):
               + f"   mean {sum(ents[l])/HEADS:.2f}")
     return path
 
+
+
+def split_heads(d):
+    """What "split into 4 heads" actually does: nothing. It is a reshape.
+
+    No parameters, no arithmetic -- head h is literally dimensions
+    [h*d_head : (h+1)*d_head] of the same vector, viewed differently.
+    """
+    m = trained(d)
+    (_, _), (Xte, _) = d
+    hd = D // HEADS
+    with torch.no_grad():
+        x = m.patch(Xte[:1])
+        x = torch.cat([m.cls.expand(1, -1, -1), x], 1) + m.pos
+        b = m.blocks[0]
+        q, _, _ = b.qkv(b.n1(x)).chunk(3, -1)
+    print(f"  q before the split  {tuple(q.shape)}")
+    print(f"    token 0's {D} numbers, first 20:")
+    print("     " + " ".join(f"{v:+5.2f}" for v in q[0, 0, :20].tolist()) + " ...\n")
+
+    q4 = q.view(1, NP + 1, HEADS, hd).transpose(1, 2)
+    print(f"  q.view(1, {NP+1}, {HEADS}, {hd}).transpose(1, 2)  ->  {tuple(q4.shape)}")
+    for h in range(HEADS):
+        same = torch.equal(q4[0, h, 0], q[0, 0, h*hd:(h+1)*hd])
+        print(f"    head {h}: " + " ".join(f"{v:+5.2f}" for v in q4[0, h, 0, :5].tolist())
+              + f"  ...   == q[0, 0, {h*hd}:{(h+1)*hd}] ?  {same}")
+    print(f"\n    same numbers      {torch.equal(q4.reshape(-1).sort().values, q.reshape(-1).sort().values)}")
+    print(f"    same storage      {q.data_ptr() == q4.data_ptr()}   (a view, not a copy)")
+    print(f"    parameters used   none")
+    print(f"    arithmetic        none \u2014 not one multiply or add")
+    print(f"\n  The multi-headedness lives in W\u1d60/W\u1d4f/W\u1d5b, not in the split. Those are single")
+    print(f"  ({D}, {D}) matrices, and training is free to make columns 0-{hd-1} compute something")
+    print(f"  different from columns {hd}-{2*hd-1}. The split only declares where the boundaries are.")
+    return q4
 
 
 # ---------------------------------------------------------------- experiments
