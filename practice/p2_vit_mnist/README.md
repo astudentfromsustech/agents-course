@@ -54,8 +54,8 @@ tensors, entering as one concatenation and one addition:
 self.cls = nn.Parameter(torch.zeros(1, 1,  64))          #    64 numbers
 self.pos = nn.Parameter(torch.randn(1, 17, 64) * 0.02)   # 1,088 numbers
 
-X = torch.cat([cls, patch_tokens], 1)   # 16 -> 17   CONCATENATED
-Z = X + pos                             # 17 -> 17   ADDED
+X = torch.cat([cls, patch_tokens], 1)   # (1,64) onto (16,64) -> (17,64)  CONCATENATED
+Z = X + pos                             # (17,64) + (17,64)     -> (17,64)  ADDED
 ```
 
 So this model does **not** use the sinusoidal `PE(pos,2i) = sin(pos/10000^(2i/d))` the chapter

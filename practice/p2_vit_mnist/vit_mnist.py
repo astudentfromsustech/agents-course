@@ -660,9 +660,11 @@ def draw_architecture(d, path="architecture.png"):
     ax.annotate("", xy=(93, 38), xytext=(86, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
     tx, ty = stack(94, 28, 11, 1.4, 16)
     slab(tx + .72, ty + 1.92, 11, 1.4, fc="#ffd8a8", ec=ACC, lw=1.1)
-    ax.text(tx + 5.5, ty + 5.4, "[CLS]", fontsize=9, color=ACC, weight="bold", ha="center")
-    bracket(93, 111, 54, "+ [CLS]  + position", "position is ADDED, not appended")
-    dims(102, 25, f"{NP+1} tokens x {D}\nd_model unchanged")
+    ax.text(tx + 5.5, ty + 5.4, f"[CLS]  (1, {D})", fontsize=8.6, color=ACC,
+            weight="bold", ha="center")
+    bracket(93, 111, 54, "+ [CLS]  + position",
+            f"cls (1, {D}) CONCATENATED\npos ({NP+1}, {D}) ADDED")
+    dims(102, 25, f"{NP} + 1 = {NP+1} tokens x {D}\nd_model unchanged")
     ax.text(102, 19.4, f"learned: {grp['cls']+grp['pos']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
 
     # 5 ---------------- the blocks, opened up
