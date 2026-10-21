@@ -51,7 +51,12 @@ def load(path="mnist.npz"):
     def pack(x, y):
         X = torch.from_numpy(x).float().div(255).sub(0.1307).div(0.3081).unsqueeze(1)
         return X.to(DEV), torch.from_numpy(y).long().to(DEV)
-    return pack(d["x_train"], d["y_train"]), pack(d["x_test"], d["y_test"])
+    tr, te = pack(d["x_train"], d["y_train"]), pack(d["x_test"], d["y_test"])
+    n_tr, n_te = tr[0].shape[0], te[0].shape[0]
+    print(f"  MNIST  {n_tr + n_te:,} images total  =  {n_tr:,} train  +  {n_te:,} test")
+    print(f"         each {tuple(tr[0].shape[1:])} — 1 greyscale channel, 28x28 px, "
+          f"labels 0-9")
+    return tr, te
 
 
 # ---------------------------------------------------------------- model
@@ -157,7 +162,7 @@ def show_data(d, n=8, path="data_and_patches.png"):
     square arrangement — only those 16 vectors in a row, which is exactly why
     the positional encoding has to put the layout back.
     """
-    (_, _), (Xte, Yte) = d
+    (Xtr, _), (Xte, Yte) = d
     img = Xte[0, 0].cpu()
     G = IMG // PATCH
     fig = plt.figure(figsize=(12, 6.4))
@@ -167,6 +172,9 @@ def show_data(d, n=8, path="data_and_patches.png"):
         ax = fig.add_subplot(gs[0, i])
         ax.imshow(Xte[i, 0].cpu(), cmap="gray"); ax.axis("off")
         ax.set_title(int(Yte[i]), fontsize=11)
+    ntr, nte = Xtr.shape[0], Xte.shape[0]
+    fig.text(.5, 1.0, f"MNIST: {ntr + nte:,} images  =  {ntr:,} train  +  {nte:,} test"
+             f"   (these {n} are from the test set)", ha="center", fontsize=10.5, va="bottom")
 
     ax = fig.add_subplot(gs[1, :2])                          # --- the cut
     ax.imshow(img, cmap="gray")
