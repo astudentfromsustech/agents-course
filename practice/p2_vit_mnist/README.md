@@ -47,6 +47,32 @@ Q and K are consumed at `Q.K^T` and never appear again; V is consumed at `A' @ V
 at the foot of the block: **Q and K only make scores, only V carries content** — which is also why
 `d_v` need not equal `d_k`.
 
+**`[CLS]` and the positional encoding have no closed-form formula** — both are plain learned
+tensors, entering as one concatenation and one addition:
+
+```python
+self.cls = nn.Parameter(torch.zeros(1, 1,  64))          #    64 numbers
+self.pos = nn.Parameter(torch.randn(1, 17, 64) * 0.02)   # 1,088 numbers
+
+X = torch.cat([cls, patch_tokens], 1)   # 16 -> 17   CONCATENATED
+Z = X + pos                             # 17 -> 17   ADDED
+```
+
+So this model does **not** use the sinusoidal `PE(pos,2i) = sin(pos/10000^(2i/d))` the chapter
+derives — ViT and BERT both use a learned table, and so does this. `cls_and_pos()` measures the
+difference rather than asserting it, as cosine between position slots:
+
+| | adjacent | far |
+|---|---:|---:|
+| learned (this model) | −0.0695 | −0.0003 |
+| sinusoidal formula | +0.9662 | +0.6685 |
+
+A sinusoid is smooth in position **by construction** (`PE(pos+k)` is a fixed rotation of
+`PE(pos)`); a learned table is not obliged to be, and at this scale finds no such structure.
+That is a property of 16 slots and 60,000 images, not a law — large ViTs do develop 2-D structure
+in theirs. It also clarifies what experiment 2 depends on: that the 17 rows are **distinct**, not
+that they are smooth.
+
 ## The point: three chapter claims, measured
 
 ### 1 · `train` — it works, and the attention maps are readable

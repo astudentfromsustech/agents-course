@@ -670,14 +670,16 @@ def draw_architecture(d, path="architecture.png"):
     hd = D // HEADS
     ax.annotate("", xy=(BX, 38), xytext=(116, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
     ax.add_patch(Rectangle((BX, 20.5), BW, 35, fc="#fff9db", ec=ACC, lw=1.6, zorder=2))
-    ax.text(BX + BW/2, 57.6, f"{LAYERS} x  TRANSFORMER BLOCK", ha="center", fontsize=10.5,
+    ax.text(BX + BW/2, 59.0, f"{LAYERS} x  TRANSFORMER BLOCK", ha="center", fontsize=10.5,
             weight="bold", color=ACC)
+    ax.text(BX + BW/2, 56.4, f"multi-head self-attention ({HEADS} heads) + MLP",
+            ha="center", fontsize=8.4, color=GRY, style="italic")
 
     rows = [
         ("x",                       f"({NP+1}, {D})",             "what arrives",                      INK),
         ("\u2193  W\u1d60  W\u1d4f  W\u1d5b",      f"3 x ({D}, {D})",            "learned",                           GRY),
-        ("Q   K   V",               f"each ({NP+1}, {D})",        f"= {HEADS} heads x ({NP+1}, {hd})", "#1c7ed6"),
-        (f"\u2193  Q \u00b7 K\u1d40 / \u221a{hd}",   f"A   ({HEADS}, {NP+1}, {NP+1})", "<- Q and K used HERE",              ACC),
+        ("Q   K   V",               f"each ({NP+1}, {D})",        f"split into {HEADS} HEADS of {hd}", "#1c7ed6"),
+        (f"\u2193  Q \u00b7 K\u1d40 / \u221a{hd}",   f"A   ({HEADS}, {NP+1}, {NP+1})", f"<- Q,K used HERE;  {HEADS} = heads",              ACC),
         ("\u2193  softmax",            "A'  same shape",             "each row sums to 1",                GRY),
         ("\u2193  A' @ V",             f"({HEADS}, {NP+1}, {hd})",   "<- V used HERE",                    ACC),
         ("\u2193  merge + W\u1d3c",       f"({NP+1}, {D})",             f"({D}, {D}) learned",               GRY),
@@ -1056,6 +1058,58 @@ def trace_cls(d, epochs=6):
     print(f"\n  Each of the {D} numbers = a learned constant + {2*LAYERS} increments.")
     print(f"  Attention supplies everything that came from the image.")
     return final
+
+
+
+def cls_and_pos(d):
+    """What [CLS] and the positional encoding actually ARE in this model.
+
+    Neither has a closed-form formula: both are learned tensors. The only
+    algebra is how they enter -- one concatenated, one added. This also
+    measures whether the learned position table discovers the 4x4 grid, and
+    compares it against the sinusoidal formula the chapter derives.
+    """
+    import itertools, math
+    m = trained(d)
+    print(f"  DEFINED as plain parameters, no formula:")
+    print(f"    self.cls = nn.Parameter(torch.zeros(1, 1, {D}))            {D} numbers")
+    print(f"    self.pos = nn.Parameter(torch.randn(1, {NP+1}, {D}) * 0.02)    {(NP+1)*D:,} numbers")
+    print(f"\n  USED in two lines:")
+    print(f"    X = [ cls ; e_1 ; ... ; e_{NP} ]   concatenate  ->  ({NP+1}, {D})")
+    print(f"    Z = X + P                        add          ->  ({NP+1}, {D})")
+    print(f"      e_k = W_patch @ flatten(patch_k) + b     the {PATCH*PATCH} -> {D} map")
+    print(f"      P   = the learned ({NP+1}, {D}) table, row i added to slot i")
+
+    P = m.pos[0].detach().cpu()[1:]                       # the NP patch slots
+    S = F.cosine_similarity(P[:, None, :], P[None, :, :], dim=-1)
+    G = IMG // PATCH
+    near, far = [], []
+    for i, j in itertools.combinations(range(NP), 2):
+        (r1, c1), (r2, c2) = divmod(i, G), divmod(j, G)
+        dist = abs(r1 - r2) + abs(c1 - c2)
+        (near if dist == 1 else far if dist >= G else []).append(float(S[i, j]))
+
+    def sinusoid(pos, dm=D):
+        v = torch.zeros(dm)
+        for i in range(dm // 2):
+            w = 1.0 / (10000 ** (2 * i / dm))
+            v[2*i], v[2*i+1] = math.sin(w * pos), math.cos(w * pos)
+        return v
+    X = torch.stack([sinusoid(p) for p in range(NP)])
+    Ss = F.cosine_similarity(X[:, None, :], X[None, :, :], dim=-1)
+    n2 = [float(Ss[i, j]) for i, j in itertools.combinations(range(NP), 2) if abs(i-j) == 1]
+    f2 = [float(Ss[i, j]) for i, j in itertools.combinations(range(NP), 2) if abs(i-j) >= NP//2]
+
+    print(f"\n  does the LEARNED table discover the {G}x{G} grid?   (cosine between slots)")
+    print(f"    {'':24}{'adjacent':>10}{'far':>10}")
+    print(f"    {'learned (this model)':24}{sum(near)/len(near):>+10.4f}{sum(far)/len(far):>+10.4f}")
+    print(f"    {'sinusoidal formula':24}{sum(n2)/len(n2):>+10.4f}{sum(f2)/len(f2):>+10.4f}")
+    print(f"\n  Sinusoids are smooth in position BY CONSTRUCTION -- PE(pos+k) is a fixed")
+    print(f"  rotation of PE(pos). A learned table has no such obligation, and at this")
+    print(f"  scale it does not find one: it just memorises {NP+1} distinct vectors, which is")
+    print(f"  all the task needs. Distinctness is what breaks permutation equivariance;")
+    print(f"  smoothness is a bonus that only matters when you extrapolate past training.")
+    return S
 
 
 
