@@ -27,6 +27,13 @@ wide. The eight blank patches come out **byte-identical**, because a blank patch
 the same background value and its token is `W @ (constant) + bias` wherever it sat. That makes
 the position argument concrete: at this stage token 0 and token 15 are indistinguishable.
 
+`trace_cls()` answers where [CLS]'s 64 floats come from. It enters as a learned constant with
+|v| = 0.05 and no image content — byte-identical for every image — and leaves at |v| = 7.2,
+because every sub-layer ADDS to it. Attention supplies everything that came from the image
+(+1.39, 1.59, 1.68, 1.63); the MLP only reshapes what is already there. Two traps the section
+names: CLS is 64 ordinary floats, not a label (0-9 appears only as the 10 outputs of
+Linear(64,10)), and position is a per-slot BIAS (added) while CLS is concatenated.
+
 `show_qkv()` draws Q, K and V for one real image — three re-expressions of the same 17 tokens,
 each 17 x 64, with the head boundaries marked at 16/32/48 — and the four 17x17 maps the heads
 produce. The four maps are visibly different from one another, which is the whole argument for

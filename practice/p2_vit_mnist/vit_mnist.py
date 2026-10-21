@@ -535,7 +535,7 @@ def draw_architecture(d, path="architecture.png"):
     BLU, BLE, ACC, INK, GRY = "#aec7e8", "#4a6fa5", "#e8590c", "#212529", "#868e96"
     GRN, RED = "#8bc34a", "#e53935"
 
-    fig, ax = plt.subplots(figsize=(18.6, 6.9))
+    fig, ax = plt.subplots(figsize=(18.6, 7.3))
     ax.set_xlim(2, 196); ax.set_ylim(0, 64); ax.axis("off")
 
     def slab(x, y, w, h, dx=2.2, dy=1.6, fc=BLU, ec=BLE, lw=.8, a=1.0):
@@ -588,9 +588,8 @@ def draw_architecture(d, path="architecture.png"):
     # 3 ---------------- token sequence (16 -> 17 planes of width 64)
     ax.annotate("", xy=(62, 38), xytext=(54, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
     stack(63, 28, 11, 1.4, 16)
-    bracket(62, 80, 54, "flatten + project", "each patch -> one 64-d token")
-    dims(71, 25, "16 tokens x 64\n(a SEQUENCE now)")
-    ax.text(71, 19.4, "(the same matrix)", ha="center", fontsize=8.6, color=GRY)
+    bracket(62, 80, 54, "flatten + project", f"each patch \u2192 one token\nof d_model = {D}")
+    dims(71, 25, f"{NP} tokens x {D}\n(a SEQUENCE now)\nthe {D} is d_model")
 
     # 4 ---------------- prepend CLS + position
     ax.annotate("", xy=(93, 38), xytext=(86, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
@@ -598,7 +597,7 @@ def draw_architecture(d, path="architecture.png"):
     slab(tx + .72, ty + 1.92, 11, 1.4, fc="#ffd8a8", ec=ACC, lw=1.1)
     ax.text(tx + 5.5, ty + 5.4, "[CLS]", fontsize=9, color=ACC, weight="bold", ha="center")
     bracket(93, 111, 54, "+ [CLS]  + position", "position is ADDED, not appended")
-    dims(102, 25, "17 tokens x 64")
+    dims(102, 25, f"{NP+1} tokens x {D}\nd_model unchanged")
     ax.text(102, 19.4, f"learned: {grp['cls']+grp['pos']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
 
     # 5 ---------------- the blocks
@@ -615,14 +614,14 @@ def draw_architecture(d, path="architecture.png"):
             fontsize=8.2, color=GRY, style="italic")
     ax.add_patch(Rectangle((130, 24.0), 25, 4.4, fc=BLU, ec=BLE, lw=.8, zorder=3))
     ax.text(142.5, 26.2, "MLP  64 -> 256 -> 64", ha="center", va="center", fontsize=8.4, color=INK)
-    dims(142.5, 22.5, "(17 x 64) in -> (17 x 64) out", c=GRY)
+    dims(142.5, 22.5, f"({NP+1} x {D}) in -> ({NP+1} x {D}) out", c=GRY)
     ax.text(142.5, 17.8, f"learned: {grp['blocks']:,}  ({grp['blocks']//4:,} x 4)", ha="center", fontsize=9, color=ACC, weight="bold")
 
     # 6 ---------------- take the CLS row
     ax.annotate("", xy=(166, 38), xytext=(160, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
     slab(166, 37.2, 13, 1.6, fc="#ffd8a8", ec=ACC, lw=1.1)
     bracket(165, 181, 54, "take row 0", "the other 16 tokens\nare discarded")
-    dims(172, 33.5, "[CLS] only:  64")
+    dims(172, 33.5, f"[CLS] only: one\nd_model vector, {D} long")
 
     # 7 ---------------- the ten classes
     for i, lab in enumerate(["0", "1", "2", "...", "9"]):
@@ -636,17 +635,20 @@ def draw_architecture(d, path="architecture.png"):
     dims(188, 22.0, "Linear(64, 10)\n-> softmax")
     ax.text(188, 16.4, f"learned: {grp['head']+grp['norm']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
 
-    ax.text(99, 12.4, "Drawn for ONE image. Every tensor really carries a leading BATCH "
+    ax.text(99, 13.8, "Drawn for ONE image. Every tensor really carries a leading BATCH "
             "axis \u2014 (256, 17, 64), not (17, 64).", ha="center", fontsize=9.4, color=INK)
-    ax.text(99, 9.9, "The 256 ride through together \u2014 but never interact: attention mixes "
+    ax.text(99, 11.6, "The 256 ride through together \u2014 but never interact: attention mixes "
             "tokens WITHIN one image, so there are 256 separate 17x17 matrices.",
             ha="center", fontsize=9.4, color=GRY)
-    ax.text(99, 7.4, f"Training set {N:,} images  =  {NB-1} x {BS} + {N - (NB-1)*BS}  "
+    ax.text(99, 9.4, f"Training set {N:,} images  =  {NB-1} x {BS} + {N - (NB-1)*BS}  "
             f"\u2192  {NB} batches per epoch  x  {EP} epochs  =  {NB*EP:,} weight updates.",
             ha="center", fontsize=9.4, color=ACC, weight="bold")
-    ax.text(99, 4.9, f"Orange = LEARNED, {TOT:,} numbers in all, every one updated by the same "
+    ax.text(99, 7.2, f"d_model = {D} is the RESIDUAL-STREAM WIDTH \u2014 set by PatchEmbed, "
+            f"unchanged through all {LAYERS} blocks, read once at the end.",
+            ha="center", fontsize=9.4, color="#1c7ed6", weight="bold")
+    ax.text(99, 5.0, f"Orange = LEARNED, {TOT:,} numbers in all, every one updated by the same "
             "loss.backward() + opt.step().", ha="center", fontsize=9.4, color=INK)
-    ax.text(99, 2.4, "No parameters at all: Q\u00b7K\u1d40, the scaling, softmax, @V, the residual "
+    ax.text(99, 2.8, "No parameters at all: Q\u00b7K\u1d40, the scaling, softmax, @V, the residual "
             "adds, the [CLS] read-out \u2014 those are fixed arithmetic.",
             ha="center", fontsize=9.4, color=GRY)
 
@@ -930,6 +932,53 @@ def show_qkv(d, epochs=6, path="qkv_heads.png"):
     plt.close(fig)
     print(f"  wrote {path}")
     return path
+
+
+
+def trace_cls(d, epochs=6):
+    """Where the 64 floats of [CLS] come from.
+
+    [CLS] enters as a learned constant with no image content at all, and every
+    sub-layer ADDS to it. Attention is the only one that can bring in anything
+    from the other tokens; the MLP only reshapes what is already there. This
+    prints the running magnitude so the accumulation is visible.
+    """
+    torch.manual_seed(0)
+    (Xtr, Ytr), (Xte, Yte) = d
+    m = ViT().to(DEV)
+    run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
+    m.eval()
+    hd = D // HEADS
+    with torch.no_grad():
+        t = m.patch(Xte[:1])
+        x = torch.cat([m.cls.expand(1, -1, -1), t], 1)
+        print(f"  A. the INITIAL {D} floats — a learned parameter, no image content")
+        print(f"     m.cls  {[round(z, 4) for z in m.cls.flatten()[:5].tolist()]} ...  "
+              f"|v| = {m.cls.norm():.4f}")
+        x = x + m.pos
+        print(f"     + pos[0]                        |v| = {x[0,0].norm():6.3f}\n")
+        print("  B. then every sub-layer ADDS to it — the residual stream:")
+        for i, b in enumerate(m.blocks):
+            h = b.n1(x); B_, T_, _ = h.shape
+            q, k, v = [z.view(B_, T_, HEADS, hd).transpose(1, 2)
+                       for z in b.qkv(h).chunk(3, -1)]
+            att = ((q @ k.transpose(-2, -1)) / hd ** .5).softmax(-1)
+            o = b.proj((att @ v).transpose(1, 2).reshape(B_, T_, D))
+            x = x + o
+            print(f"     block {i+1} attention  += {o[0,0].norm():6.3f}   "
+                  f"running |v| = {x[0,0].norm():6.3f}   reads the {NP} patches")
+            dd = b.mlp(b.n2(x)); x = x + dd
+            print(f"     block {i+1} MLP        += {dd[0,0].norm():6.3f}   "
+                  f"running |v| = {x[0,0].norm():6.3f}   this token alone")
+        final = m.norm(x)[:, 0]
+        logits = m.head(final)
+    print(f"\n  C. final LayerNorm -> the {D} floats the classifier reads:")
+    print(f"     {[round(z, 3) for z in final[0,:6].tolist()]} ...  |v| = {final.norm():.3f}")
+    print(f"     Linear({D}, 10) -> {[round(z, 2) for z in logits[0].tolist()]}")
+    print(f"     argmax -> {int(logits.argmax())}   (true label {int(Yte[0])})")
+    print(f"\n  Each of the {D} numbers = a learned constant + {2*LAYERS} increments.")
+    print(f"  Attention supplies everything that came from the image.")
+    return final
 
 
 
