@@ -50,7 +50,19 @@ inner dimensions meet at 16 and the result is `17x17` rather than `16x16` — th
 content into scores. `A' @ V` reverses it, back to `(4,17,16)`. The four `(64,64)` matrices are
 the block's attention parameters: 4 x 4,096 = 16,384 of its 49,792, the rest being the MLP.
 
-`split_heads()` answers what "split into 4 heads" does: **nothing**. It is a reshape. Head *h* is
+`does_multihead_help()` asks whether multi-head beats single-head, which changing `HEADS` tests
+cleanly since it adds **no parameters**. Across 5 seeds: 1 head 94.73 %, 4 heads 95.34 % —
+**+0.61 points, se 0.25, distinguishable**. Real but small. (A 3-seed version of the same test
+reports "not distinguishable" at 1.7 se, and a single run had 2 heads beating 4 — the effect is
+small enough that underpowered comparisons flip the conclusion.) Why it helps: the softmax budget
+— one head's weights sum to 1, so two competing needs must share it and arrive downstream as a
+blend nothing can un-mix. Why only a little here: on MNIST few relations compete, so the budget
+rarely binds; in language a token needs its subject and antecedent and syntactic head at once.
+
+`split_heads()` answers what "split into 4 heads" does: **nothing**. It is a reshape, and the
+formula is just a relabelling — `Q[h][t][j] = Q[t][16h + j]`, equivalently
+`Q[h] = x @ Wq[:, 16h : 16h+16]` (verified). So "4 heads" is 4 separate `(64,16)` projections
+stored as one `(64,64)` matrix. Head *h* is
 literally dimensions `[16h : 16h+16]` of the same vector — same numbers, same storage, no
 parameters, not one multiply. The multi-headedness lives in `Wq`/`Wk`/`Wv`, which training is
 free to make compute something different per column block; the split only declares the

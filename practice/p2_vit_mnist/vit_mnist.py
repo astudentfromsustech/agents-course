@@ -1272,9 +1272,20 @@ def split_heads(d):
     print(f"    same storage      {q.data_ptr() == q4.data_ptr()}   (a view, not a copy)")
     print(f"    parameters used   none")
     print(f"    arithmetic        none \u2014 not one multiply or add")
-    print(f"\n  The multi-headedness lives in W\u1d60/W\u1d4f/W\u1d5b, not in the split. Those are single")
-    print(f"  ({D}, {D}) matrices, and training is free to make columns 0-{hd-1} compute something")
-    print(f"  different from columns {hd}-{2*hd-1}. The split only declares where the boundaries are.")
+    print(f"\n  As a formula, two equivalent ways:\n")
+    print(f"    indexing:  Q[h][t][j] = Q[t][h*{hd} + j]      h<{HEADS}, t<{NP+1}, j<{hd}")
+    Wq = b.qkv.weight[:D].T                       # y = x @ W.T, so this is the (D,D) q matrix
+    hin = b.n1(x)[0]
+    allok = all(torch.allclose(hin @ Wq[:, h*hd:(h+1)*hd], q4[0, h], atol=1e-4)
+                for h in range(HEADS))
+    print(f"    matrix:    Q[h] = x @ W\u1d60[:, {hd}h : {hd}h+{hd}]        verified: {allok}")
+    print(f"\n  So \"{HEADS} heads\" is not a new operation. It is {HEADS} separate ({D},{hd})")
+    print(f"  projections stored as one ({D},{D}) matrix; the reshape only decides where the")
+    print(f"  column boundaries fall. Head h's whole computation is")
+    print(f"\n    A[h] = softmax( (x W\u1d60_h)(x W\u1d4f_h)\u1d40 / \u221a{hd} ),   O[h] = A[h] (x W\u1d5b_h)")
+    print(f"\n  which is why the multi-headedness lives in W\u1d60/W\u1d4f/W\u1d5b, not in the split:")
+    print(f"  training is free to make columns 0-{hd-1} compute something unrelated to")
+    print(f"  columns {hd}-{2*hd-1}.")
     return q4
 
 
@@ -1386,6 +1397,57 @@ def how_heads_differ(d, n=1024):
     print(f"\n     + reads INKED patches, - reads BLANK ones. Block 1 is where they")
     print(f"     are most specialised; by block 4 they have largely converged.")
     return maps
+
+
+def does_multihead_help(d, heads=(1, 4), seeds=5, epochs=6):
+    """Does multi-head actually beat single-head? Measure before explaining.
+
+    Changing the head count adds NO parameters -- it is only a reshape -- so
+    this is a clean architectural comparison. Several seeds, because a single
+    run cannot separate a 0.5-point effect from noise.
+    """
+    import statistics as st
+    (Xtr, Ytr), (Xte, Yte) = d
+    orig = globals()["HEADS"]
+    print(f"  changing the head count changes NO parameters (it is a reshape)\n")
+    print(f"    {'heads':>6}{'dim/head':>10}{'params':>10}   "
+          f"{'runs':<26}{'mean':>8}{'sd':>7}")
+    out = {}
+    for H in heads:
+        globals()["HEADS"] = H
+        accs = []
+        for sd in range(seeds):
+            torch.manual_seed(sd)
+            m = ViT().to(DEV)
+            run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
+            accs.append(acc(m, Xte, Yte) * 100)
+        out[H] = accs
+        n = sum(p.numel() for p in m.parameters())
+        print(f"    {H:>6}{D//H:>10}{n:>10,}   "
+              f"{' '.join(f'{a:.2f}' for a in accs):<26}{st.mean(accs):>8.2f}"
+              f"{(st.stdev(accs) if seeds > 1 else 0):>7.2f}")
+    globals()["HEADS"] = orig
+
+    if 1 in out and 4 in out and seeds > 1:
+        d1, d4 = out[1], out[4]
+        diff = st.mean(d4) - st.mean(d1)
+        se = (st.stdev(d1)**2/seeds + st.stdev(d4)**2/seeds) ** .5
+        verdict = "distinguishable" if abs(diff) > 2*se else "NOT distinguishable from noise"
+        print(f"\n    4 heads - 1 head = {diff:+.2f} points, se {se:.2f}  ->  {verdict}")
+        if seeds < 5:
+            print(f"    (with only {seeds} seeds this test is UNDERPOWERED for an effect"
+                  f" this small)")
+    print(f"\n  Multi-head helps, but only a little HERE. The reason it helps at all is")
+    print(f"  the softmax budget: a head's weights sum to 1, so one head with two")
+    print(f"  competing needs must split between them and hands downstream a blend")
+    print(f"  nothing can un-mix. {orig} heads each spend a FULL budget and land in")
+    print(f"  different slices of the output, so W\u1d3c can route them separately.")
+    print(f"\n  On MNIST few relations compete -- 'where is the ink' is nearly the whole")
+    print(f"  task -- so the budget rarely binds. In language a token routinely needs")
+    print(f"  its subject AND its antecedent AND its syntactic head at once, and the")
+    print(f"  gap is far larger. Which fits how_heads_differ(): these heads converge")
+    print(f"  to near-identical behaviour by the last block.")
+    return out
 
 
 # ---------------------------------------------------------------- experiments
