@@ -19,5 +19,6 @@ practice/*/shape_flow.png
 practice/*/architecture.png
 practice/*/tokens.png
 practice/*/filters.png
+practice/*/qkv_heads.png
 practice/**/mnist.npz
 practice/**/data/

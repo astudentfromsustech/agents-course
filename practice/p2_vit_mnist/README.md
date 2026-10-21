@@ -27,6 +27,13 @@ wide. The eight blank patches come out **byte-identical**, because a blank patch
 the same background value and its token is `W @ (constant) + bias` wherever it sat. That makes
 the position argument concrete: at this stage token 0 and token 15 are indistinguishable.
 
+`show_qkv()` draws Q, K and V for one real image — three re-expressions of the same 17 tokens,
+each 17 x 64, with the head boundaries marked at 16/32/48 — and the four 17x17 maps the heads
+produce. The four maps are visibly different from one another, which is the whole argument for
+multi-head. `HEADS = 4` per block x `LAYERS = 4` = 16 heads in the model, and the heads SPLIT
+the width (head 0 gets dims 0-15, head 1 16-31, ...), which is why d_model must divide by the
+head count: 49/4 = 12.25 and PyTorch refuses the view outright.
+
 `show_filters()` answers "when are those weights learned?" — in the same loop as everything
 else. Row j of the embedding matrix is a 7x7 filter, so it can be drawn: at init, after six
 epochs, and the difference on the same colour scale. The third panel is nearly blank.

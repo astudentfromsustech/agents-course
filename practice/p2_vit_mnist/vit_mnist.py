@@ -865,6 +865,74 @@ def show_filters(d, epochs=6, path="filters.png"):
 
 
 
+def show_qkv(d, epochs=6, path="qkv_heads.png"):
+    """Q, K and V for one real image, and the 4 heads they are cut into.
+
+    Top row: the token matrix going in, then Q, K, V — each 17 x 64, with the
+    head boundaries drawn at 16 / 32 / 48. Bottom row: the 17x17 attention
+    matrix each head computes from its own 16-column slice.
+
+    Trains first, so the patterns are the trained ones rather than noise.
+    """
+    torch.manual_seed(0)
+    (Xtr, Ytr), (Xte, Yte) = d
+    m = ViT().to(DEV)
+    run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
+    m.eval()
+    hd, T1 = D // HEADS, NP + 1
+
+    with torch.no_grad():
+        x = m.patch(Xte[:1])
+        x = torch.cat([m.cls.expand(1, -1, -1), x], 1) + m.pos
+        b = m.blocks[0]
+        h = b.n1(x)
+        q, k, v = b.qkv(h).chunk(3, dim=-1)
+        q4, k4, v4 = [z.view(1, T1, HEADS, hd).transpose(1, 2) for z in (q, k, v)]
+        att = ((q4 @ k4.transpose(-2, -1)) / hd ** .5).softmax(-1)[0].cpu()
+    mats = [z[0].cpu() for z in (x, q, k, v)]
+
+    fig = plt.figure(figsize=(15.5, 7.4))
+    gs = fig.add_gridspec(2, HEADS, height_ratios=[1.25, 1], hspace=.42, wspace=.22)
+
+    for j, (M, name) in enumerate(zip(mats, ["x  (into the block)", "Q", "K", "V"])):
+        ax = fig.add_subplot(gs[0, j])
+        vmax = float(M.abs().max())
+        ax.imshow(M, cmap="RdBu_r", vmin=-vmax, vmax=vmax, aspect="auto")
+        if j:
+            for c in range(1, HEADS):
+                ax.axvline(c * hd - .5, color="#2f9e44", lw=1.6)
+            for c in range(HEADS):
+                ax.text(c * hd + hd / 2, T1 - 1.1, f"h{c}", ha="center", va="center",
+                        fontsize=8.5, color="#2f9e44", weight="bold",
+                        bbox=dict(fc="white", ec="#2f9e44", lw=.7, pad=1.4, alpha=.9))
+        ax.set_title(f"{name}   ({T1} x {D})", fontsize=10.5,
+                     color="#212529" if j == 0 else "#1c7ed6", pad=6)
+        ax.set_ylabel("token" if j == 0 else "", fontsize=9)
+        ax.set_yticks(range(0, T1, 4)); ax.tick_params(labelsize=7.5)
+        ax.set_xlabel(f"{D} dims, cut into {HEADS} heads of {hd}" if j else f"{D} dims, not yet split", fontsize=8.5)
+
+    for c in range(HEADS):
+        ax = fig.add_subplot(gs[1, c])
+        ax.imshow(att[c], cmap="magma", vmin=0, vmax=float(att.max()))
+        ax.set_title(f"head {c}:  softmax(q·k$^T$/$\\sqrt{{16}}$)   ({T1} x {T1})", fontsize=9.5)
+        ax.set_xticks([0]); ax.set_xticklabels(["[CLS]"], fontsize=7.5)
+        ax.set_yticks([0]); ax.set_yticklabels(["[CLS]"], fontsize=7.5)
+        ax.set_xlabel("key token", fontsize=8.5)
+        if c == 0: ax.set_ylabel("query token", fontsize=8.5)
+
+    fig.text(.5, .035, "Q, K and V are the SAME 17 tokens re-expressed three ways. The green lines "
+             "cut each into 4 heads of 16 columns;", ha="center", fontsize=10, color="#212529")
+    fig.text(.5, .003, "head c scores its own 16-column slice against itself, giving the four "
+             f"{T1}x{T1} maps below. Block 1 of {LAYERS}, one image.",
+             ha="center", fontsize=10, color="#495057")
+    fig.subplots_adjust(bottom=.11)
+    fig.savefig(path, dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  wrote {path}")
+    return path
+
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own
