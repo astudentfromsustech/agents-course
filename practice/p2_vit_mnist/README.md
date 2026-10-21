@@ -32,19 +32,23 @@ The architecture figure opens the transformer block rather than drawing it as a 
 of the flow with its shape, and orange arrows on the two steps that consume Q, K and V.
 
 ```
-x                  (17, 64)        what arrives
-Wq Wk Wv           3 x (64, 64)    learned
-Q  K  V            each (17, 64)   = 4 heads x (17, 16)
-Q.K^T / sqrt(16)   A (4, 17, 17)   <- Q and K used HERE
-softmax            A' same shape
-A' @ V             (4, 17, 16)     <- V used HERE
-merge + W^O        (17, 64)
-x + attn(x)                        residual
-x + MLP(x)                         64->256->64, per token
+x                (17,64)
+Q = x @ Wq       (17,64) @ (64,64) = (17,64)            Wq learned
+K = x @ Wk       (17,64) @ (64,64) = (17,64)            Wk learned
+V = x @ Wv       (17,64) @ (64,64) = (17,64)            Wv learned
+split 4 heads    (17,64) -> (4,17,16)                   a RESHAPE - no maths
+Q @ K^T/sqrt16   (4,17,16) @ (4,16,17) = (4,17,17)      <- Q,K used HERE
+softmax          (4,17,17) unchanged                    each row sums to 1
+A' @ V           (4,17,17) @ (4,17,16) = (4,17,16)      <- V used HERE
+merge @ W^O      (17,64) @ (64,64) = (17,64)            W^O learned
+x + attn(x)      (17,64)                                residual
+x + MLP(x)       (17,64)                                64->256->64
 ```
 
-Each of Q, K, V now carries its own equation — `Q = x @ Wq` with `Wq` a learned `(64, 64)` —
-rather than being lumped on one line.
+Every operand carries its shape, so the transpose is visible: `(4,17,16) @ (4,16,17)` is why the
+inner dimensions meet at 16 and the result is `17x17` rather than `16x16` — the step that turns
+content into scores. `A' @ V` reverses it, back to `(4,17,16)`. The four `(64,64)` matrices are
+the block's attention parameters: 4 x 4,096 = 16,384 of its 49,792, the rest being the MLP.
 
 `split_heads()` answers what "split into 4 heads" does: **nothing**. It is a reshape. Head *h* is
 literally dimensions `[16h : 16h+16]` of the same vector — same numbers, same storage, no
