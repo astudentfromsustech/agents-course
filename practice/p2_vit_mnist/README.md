@@ -17,6 +17,25 @@ batching, shapes, Q/K/V and the 4 heads, `[CLS]` and position), **3 · how it le
 the loss curve, whether the patch filters move), and **4 · the three measurements** below.
 Figures that need a trained model share one, so the whole notebook runs in ~2 minutes.
 
+The architecture figure opens the transformer block rather than drawing it as a box: every line
+of the flow with its shape, and orange arrows on the two steps that consume Q, K and V.
+
+```
+x                  (17, 64)        what arrives
+Wq Wk Wv           3 x (64, 64)    learned
+Q  K  V            each (17, 64)   = 4 heads x (17, 16)
+Q.K^T / sqrt(16)   A (4, 17, 17)   <- Q and K used HERE
+softmax            A' same shape
+A' @ V             (4, 17, 16)     <- V used HERE
+merge + W^O        (17, 64)
+x + attn(x)                        residual
+x + MLP(x)                         64->256->64, per token
+```
+
+Q and K are consumed at `Q.K^T` and never appear again; V is consumed at `A' @ V`. Hence the line
+at the foot of the block: **Q and K only make scores, only V carries content** — which is also why
+`d_v` need not equal `d_k`.
+
 ## The point: three chapter claims, measured
 
 ### 1 · `train` — it works, and the attention maps are readable

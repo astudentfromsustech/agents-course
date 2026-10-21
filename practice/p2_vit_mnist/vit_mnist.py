@@ -555,8 +555,8 @@ def draw_architecture(d, path="architecture.png"):
     BLU, BLE, ACC, INK, GRY = "#aec7e8", "#4a6fa5", "#e8590c", "#212529", "#868e96"
     GRN, RED = "#8bc34a", "#e53935"
 
-    fig, ax = plt.subplots(figsize=(18.6, 7.3))
-    ax.set_xlim(2, 196); ax.set_ylim(0, 64); ax.axis("off")
+    fig, ax = plt.subplots(figsize=(20.6, 7.3))
+    ax.set_xlim(2, 212); ax.set_ylim(0, 64); ax.axis("off")
 
     def slab(x, y, w, h, dx=2.2, dy=1.6, fc=BLU, ec=BLE, lw=.8, a=1.0):
         """one isometric box: front face + top + right side"""
@@ -620,55 +620,72 @@ def draw_architecture(d, path="architecture.png"):
     dims(102, 25, f"{NP+1} tokens x {D}\nd_model unchanged")
     ax.text(102, 19.4, f"learned: {grp['cls']+grp['pos']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
 
-    # 5 ---------------- the blocks
-    ax.annotate("", xy=(126, 38), xytext=(120, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
-    ax.add_patch(Rectangle((126, 20.5), 33, 35, fc="#fff9db", ec=ACC, lw=1.6, zorder=2))
-    ax.text(142.5, 57.6, "4 x  TRANSFORMER BLOCK", ha="center", fontsize=10.5,
+    # 5 ---------------- the blocks, opened up
+    BX, BW = 122, 52
+    hd = D // HEADS
+    ax.annotate("", xy=(BX, 38), xytext=(116, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
+    ax.add_patch(Rectangle((BX, 20.5), BW, 35, fc="#fff9db", ec=ACC, lw=1.6, zorder=2))
+    ax.text(BX + BW/2, 57.6, f"{LAYERS} x  TRANSFORMER BLOCK", ha="center", fontsize=10.5,
             weight="bold", color=ACC)
-    for i in range(3, -1, -1):                       # 4 heads of a 17x17 matrix
-        ax.add_patch(Rectangle((135 + i*1.1, 38 + i*.9), 11, 11,
-                               fc="#ffd8a8", ec=ACC, lw=.9, zorder=3))
-    ax.text(142.5, 36.0, "attention  17 x 17, 4 heads", ha="center", va="top",
-            fontsize=8.6, color=ACC, weight="bold")
-    ax.text(142.5, 33.0, "the ONLY step that mixes tokens", ha="center", va="top",
-            fontsize=8.2, color=GRY, style="italic")
-    ax.add_patch(Rectangle((130, 24.0), 25, 4.4, fc=BLU, ec=BLE, lw=.8, zorder=3))
-    ax.text(142.5, 26.2, "MLP  64 -> 256 -> 64", ha="center", va="center", fontsize=8.4, color=INK)
-    dims(142.5, 22.5, f"({NP+1} x {D}) in -> ({NP+1} x {D}) out", c=GRY)
-    ax.text(142.5, 17.8, f"learned: {grp['blocks']:,}  ({grp['blocks']//4:,} x 4)", ha="center", fontsize=9, color=ACC, weight="bold")
+
+    rows = [
+        ("x",                       f"({NP+1}, {D})",             "what arrives",                      INK),
+        ("\u2193  W\u1d60  W\u1d4f  W\u1d5b",      f"3 x ({D}, {D})",            "learned",                           GRY),
+        ("Q   K   V",               f"each ({NP+1}, {D})",        f"= {HEADS} heads x ({NP+1}, {hd})", "#1c7ed6"),
+        (f"\u2193  Q \u00b7 K\u1d40 / \u221a{hd}",   f"A   ({HEADS}, {NP+1}, {NP+1})", "<- Q and K used HERE",              ACC),
+        ("\u2193  softmax",            "A'  same shape",             "each row sums to 1",                GRY),
+        ("\u2193  A' @ V",             f"({HEADS}, {NP+1}, {hd})",   "<- V used HERE",                    ACC),
+        ("\u2193  merge + W\u1d3c",       f"({NP+1}, {D})",             f"({D}, {D}) learned",               GRY),
+        ("x + attn(x)",             f"({NP+1}, {D})",             "residual",                          "#2f9e44"),
+        ("x + MLP(x)",              f"({NP+1}, {D})",             f"{D}->{4*D}->{D}, per token",       "#2f9e44"),
+    ]
+    yy = 53.0
+    for lab, shp, note, col in rows:
+        ax.text(BX + 1.6, yy, lab, va="center", ha="left", fontsize=7.8, color=col,
+                weight="bold" if col in (ACC, "#2f9e44", "#1c7ed6") else "normal")
+        ax.text(BX + 19.5, yy, shp, va="center", ha="left", fontsize=7.4,
+                family="monospace", color="#1c7ed6")
+        ax.text(BX + 34.0, yy, note, va="center", ha="left", fontsize=7.0,
+                color=ACC if note.startswith("<-") else GRY)
+        yy -= 3.35
+
+    ax.text(BX + BW/2, 22.4, "Q and K only make SCORES.  Only V carries content.",
+            ha="center", fontsize=8.0, color=ACC, style="italic")
+    ax.text(BX + BW/2, 17.8, f"learned: {grp['blocks']:,}  ({grp['blocks']//LAYERS:,} x {LAYERS})",
+            ha="center", fontsize=9, color=ACC, weight="bold")
 
     # 6 ---------------- take the CLS row
-    ax.annotate("", xy=(166, 38), xytext=(160, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
-    slab(166, 37.2, 13, 1.6, fc="#ffd8a8", ec=ACC, lw=1.1)
-    bracket(165, 181, 54, "take row 0", "the other 16 tokens\nare discarded")
-    dims(172, 33.5, f"[CLS] only: one\nd_model vector, {D} long")
+    ax.annotate("", xy=(180, 38), xytext=(174, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
+    slab(180, 37.2, 13, 1.6, fc="#ffd8a8", ec=ACC, lw=1.1)
+    bracket(179, 195, 54, "take row 0", "the other 16 tokens\nare discarded")
+    dims(186, 33.5, f"[CLS] only: one\nd_model vector, {D} long")
 
     # 7 ---------------- the ten classes
     for i, lab in enumerate(["0", "1", "2", "...", "9"]):
         yy = 48 - i * 5.2
         if lab == "...":
-            ax.text(188, yy, "\u22ee", ha="center", va="center", fontsize=13); continue
-        ax.add_patch(Circle((188, yy), 1.55, fc=RED, ec="#b71c1c", lw=.8, zorder=4))
-        ax.text(191.2, yy, lab, va="center", fontsize=10, weight="bold")
-        ax.plot([181.5, 186.4], [38.5, yy], color=BLE, lw=.5, alpha=.55, zorder=1)
-    ax.text(188, 53.5, "OUTPUT", ha="center", fontsize=10.5, weight="bold")
-    dims(188, 22.0, "Linear(64, 10)\n-> softmax")
-    ax.text(188, 16.4, f"learned: {grp['head']+grp['norm']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
+            ax.text(202, yy, "\u22ee", ha="center", va="center", fontsize=13); continue
+        ax.add_patch(Circle((202, yy), 1.55, fc=RED, ec="#b71c1c", lw=.8, zorder=4))
+        ax.text(205.2, yy, lab, va="center", fontsize=10, weight="bold")
+        ax.plot([195.5, 200.4], [38.5, yy], color=BLE, lw=.5, alpha=.55, zorder=1)
+    ax.text(202, 53.5, "OUTPUT", ha="center", fontsize=10.5, weight="bold")
+    dims(202, 22.0, "Linear(64, 10)\n-> softmax")
+    ax.text(202, 16.4, f"learned: {grp['head']+grp['norm']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
 
-    ax.text(99, 13.8, "Drawn for ONE image. Every tensor really carries a leading BATCH "
+    ax.text(107, 13.8, "Drawn for ONE image. Every tensor really carries a leading BATCH "
             "axis \u2014 (256, 17, 64), not (17, 64).", ha="center", fontsize=9.4, color=INK)
-    ax.text(99, 11.6, "The 256 ride through together \u2014 but never interact: attention mixes "
+    ax.text(107, 11.6, "The 256 ride through together \u2014 but never interact: attention mixes "
             "tokens WITHIN one image, so there are 256 separate 17x17 matrices.",
             ha="center", fontsize=9.4, color=GRY)
-    ax.text(99, 9.4, f"Training set {N:,} images  =  {NB-1} x {BS} + {N - (NB-1)*BS}  "
+    ax.text(107, 9.4, f"Training set {N:,} images  =  {NB-1} x {BS} + {N - (NB-1)*BS}  "
             f"\u2192  {NB} batches per epoch  x  {EP} epochs  =  {NB*EP:,} weight updates.",
             ha="center", fontsize=9.4, color=ACC, weight="bold")
-    ax.text(99, 7.2, f"d_model = {D} is the RESIDUAL-STREAM WIDTH \u2014 set by PatchEmbed, "
+    ax.text(107, 7.2, f"d_model = {D} is the RESIDUAL-STREAM WIDTH \u2014 set by PatchEmbed, "
             f"unchanged through all {LAYERS} blocks, read once at the end.",
             ha="center", fontsize=9.4, color="#1c7ed6", weight="bold")
-    ax.text(99, 5.0, f"Orange = LEARNED, {TOT:,} numbers in all, every one updated by the same "
+    ax.text(107, 5.0, f"Orange = LEARNED, {TOT:,} numbers in all, every one updated by the same "
             "loss.backward() + opt.step().", ha="center", fontsize=9.4, color=INK)
-    ax.text(99, 2.8, "No parameters at all: Q\u00b7K\u1d40, the scaling, softmax, @V, the residual "
+    ax.text(107, 2.8, "No parameters at all: Q\u00b7K\u1d40, the scaling, softmax, @V, the residual "
             "adds, the [CLS] read-out \u2014 those are fixed arithmetic.",
             ha="center", fontsize=9.4, color=GRY)
 
