@@ -1278,6 +1278,58 @@ def split_heads(d):
     return q4
 
 
+class Pooled(ViT):
+    """The same model with NO [CLS] token: pool the patch tokens instead.
+
+    Used by why_cls() to ask whether the [CLS] token is actually needed.
+    """
+    def __init__(self, how="mean"):
+        super().__init__()
+        self.how = how
+        self.pos = nn.Parameter(torch.randn(1, NP, D) * 0.02)   # NP slots, no [CLS]
+
+    def forward(self, x, perm=None, keep_attn=False):
+        t = self.patch(x)
+        if perm is not None:
+            t = t[:, perm]
+        t = t + self.pos
+        for b in self.blocks:
+            t, _ = b(t, False)
+        t = self.norm(t)
+        p = t.mean(1) if self.how == "mean" else t.max(1).values
+        return self.head(p), []
+
+
+def why_cls(d, epochs=6):
+    """Is the [CLS] token actually needed? Train the alternatives and see.
+
+    The block emits NP+1 vectors; classification needs ONE. Something has to
+    collapse the sequence. [CLS] is one way; pooling the patch tokens is
+    another. Same model, same budget -- only the read-out differs.
+    """
+    (Xtr, Ytr), (Xte, Yte) = d
+    print("  same model, same budget — only the READ-OUT differs\n")
+    print(f"    {'read-out':16}{'params':>9}{'test acc':>11}")
+    out = {}
+    for name, make in [("[CLS] token", lambda: ViT()),
+                       ("mean-pool",   lambda: Pooled("mean")),
+                       ("max-pool",    lambda: Pooled("max"))]:
+        torch.manual_seed(0)
+        m = make().to(DEV)
+        run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
+        a = acc(m, Xte, Yte)
+        out[name] = a
+        print(f"    {name:16}{sum(p.numel() for p in m.parameters()):>9,}{a*100:>10.2f}%")
+    print(f"\n  Single runs at one seed, so read this as 'no meaningful difference'")
+    print(f"  rather than 'pooling wins'. The point is that [CLS] is NOT required.")
+    print(f"\n  The ViT paper agrees. Its stated reason for the token is inheritance:")
+    print(f'    "Similar to BERT\'s [class] token, we prepend a learnable embedding')
+    print(f'     to the sequence of embedded patches"')
+    print(f"  and its Appendix D.3, comparing against global average pooling:")
+    print(f'    "Both work similarly well, but require different learning-rates."')
+    return out
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

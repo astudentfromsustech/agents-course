@@ -87,6 +87,23 @@ difference rather than asserting it, as cosine between position slots:
 | learned (this model) | −0.0695 | −0.0003 |
 | sinusoidal formula | +0.9662 | +0.6685 |
 
+`why_cls()` asks whether the [CLS] token is even needed. The block emits 17 vectors and
+classification needs one, so something must collapse the sequence — [CLS], or pooling the patch
+tokens. Same model, same budget, only the read-out differs:
+
+| read-out | params | test acc |
+|---|---:|---:|
+| `[CLS]` token | 204,298 | 95.24 % |
+| mean-pool | 204,234 | 95.62 % |
+| max-pool | 204,234 | 95.96 % |
+
+**No** — pooling matches or beats it. (Single runs at one seed: read this as "no meaningful
+difference", not "pooling wins".) The ViT paper's own reason for the token is inheritance, not
+superiority — *"Similar to BERT's [class] token, we prepend a learnable embedding to the sequence
+of embedded patches"* — and its Appendix D.3 concludes of CLS vs global average pooling:
+*"Both work similarly well, but require different learning-rates."* So it is a convention, and a
+defensible one, not a necessity.
+
 `pos_contents()` then shows what is actually in them. `[CLS]` starts at exactly zero and barely
 moves (±0.02, |v| = 0.05) — a placeholder attention fills. Position really is learned (±0.3, 3.4x
 its init), and its per-slot magnitudes are **not uniform**: centre 2x2 mean 0.879, edges 0.408,
