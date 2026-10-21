@@ -128,6 +128,26 @@ class SmallCNN(nn.Module):
         return self.f(x), []
 
 
+# ---------------------------------------------------------------- a shared model
+_CACHE = {}
+
+def trained(d, epochs=6):
+    """One trained model, reused by every figure that needs one.
+
+    show_filters() and show_training() still train their own, because they need
+    the weights BEFORE training and the loss at every step respectively. The
+    rest just need a model that works, so they share this one.
+    """
+    if epochs not in _CACHE:
+        (Xtr, Ytr), (Xte, Yte) = d
+        torch.manual_seed(0)
+        m = ViT().to(DEV)
+        run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
+        _CACHE[epochs] = m.eval()
+    return _CACHE[epochs]
+
+
+
 # ---------------------------------------------------------------- look at it
 def show_data(d, n=8, path="data_and_patches.png"):
     """What the model is actually handed.
@@ -831,6 +851,7 @@ def show_filters(d, epochs=6, path="filters.png"):
     W0 = m.patch.proj.weight.detach().clone().cpu()
     run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
     W1 = m.patch.proj.weight.detach().clone().cpu()
+    _CACHE.setdefault(epochs, m.eval())          # share this one with the other figures
     acc1, cos = acc(m, Xte, Yte), float(F.cosine_similarity(W0.flatten(), W1.flatten(), dim=0))
 
     def grid(ax, W, title, vlim=None):
@@ -876,11 +897,8 @@ def show_qkv(d, epochs=6, path="qkv_heads.png"):
 
     Trains first, so the patterns are the trained ones rather than noise.
     """
-    torch.manual_seed(0)
     (Xtr, Ytr), (Xte, Yte) = d
-    m = ViT().to(DEV)
-    run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
-    m.eval()
+    m = trained(d, epochs)                 # shared: trains once, reused
     hd, T1 = D // HEADS, NP + 1
 
     with torch.no_grad():
@@ -943,11 +961,8 @@ def trace_cls(d, epochs=6):
     from the other tokens; the MLP only reshapes what is already there. This
     prints the running magnitude so the accumulation is visible.
     """
-    torch.manual_seed(0)
     (Xtr, Ytr), (Xte, Yte) = d
-    m = ViT().to(DEV)
-    run(m, Xtr, Ytr, Xte, Yte, epochs=epochs, quiet=True)
-    m.eval()
+    m = trained(d, epochs)                 # shared: trains once, reused
     hd = D // HEADS
     with torch.no_grad():
         t = m.patch(Xte[:1])
