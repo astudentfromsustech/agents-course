@@ -133,6 +133,43 @@ class SmallCNN(nn.Module):
         return self.f(x), []
 
 
+# ---------------------------------------------------------------- folding
+def fold(fn, *args, label=None, start_open=False, **kw):
+    """Run fn and render everything it produced inside a click-to-expand block.
+
+    Captures the function's printed output and, if it returns a .png path,
+    embeds that image too — then wraps both in an HTML <details>, which every
+    notebook front-end renders as a real disclosure triangle you can click.
+
+        fold(show_data, d, label="the data and the patches")
+    """
+    import base64, builtins, contextlib, io, html as _html
+    from IPython.display import HTML, display
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        out = fn(*args, **kw)
+    text = buf.getvalue().rstrip()
+
+    body = ""
+    if text:
+        body += f'<pre style="margin:.4em 0;line-height:1.35">{_html.escape(text)}</pre>'
+    if isinstance(out, str) and out.endswith(".png") and os.path.exists(out):
+        with builtins.open(out, "rb") as fh:
+            b64 = base64.b64encode(fh.read()).decode()
+        body += f'<img src="data:image/png;base64,{b64}" style="max-width:100%">'
+
+    title = label or getattr(fn, "__name__", "details")
+    display(HTML(
+        f'<details {"open" if start_open else ""} style="margin:.3em 0">'
+        f'<summary style="cursor:pointer;font-weight:600;color:#1c7ed6;'
+        f'padding:.25em 0;user-select:none">{_html.escape(title)}</summary>'
+        f'<div style="padding:.4em 0 .2em 1.1em;border-left:2px solid #dee2e6;'
+        f'margin-left:.35em">{body}</div></details>'))
+    return out
+
+
+
 # ---------------------------------------------------------------- a shared model
 _CACHE = {}
 

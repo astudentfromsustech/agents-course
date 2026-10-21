@@ -18,9 +18,15 @@ the loss curve, whether the patch filters move), and **4 · the three measuremen
 Figures that need a trained model share one, so the whole notebook runs in ~2 minutes.
 
 The notebook is **committed with its outputs already in it**, so you can read every result
-without running anything. Parts 1-3 ship with their **outputs folded** — run all, then expand only what you want to look
+without running anything. Each explanation renders inside a **click-to-expand block** — a real
+`<details>` widget, so it works the same in Jupyter, Colab and on GitHub. Parts 1-3 arrive
+collapsed — run all, then expand only what you want to look
 at. The three measurements in part 4 stay open, since they are the point. Click the margin left
 of an output to expand it (Jupyter), or use the arrow (Colab/Lab).
+
+`rebuild.sh` re-runs the notebook and checks the result (images embedded, no error outputs, no
+empty cells, the fold blocks present). Run it after any edit to `vit_mnist.py` or to a cell —
+otherwise the committed outputs go stale.
 
 The architecture figure opens the transformer block rather than drawing it as a box: every line
 of the flow with its shape, and orange arrows on the two steps that consume Q, K and V.
