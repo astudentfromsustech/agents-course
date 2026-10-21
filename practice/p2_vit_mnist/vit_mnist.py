@@ -1711,6 +1711,60 @@ def steps(d, img_i=0, open_first=True):
     return pred
 
 
+def explore(d, n=500):
+    """Live scrubbing: drag a slider, the eight stages redraw for that digit.
+
+    Needs ipywidgets. Without it this falls back to the static stepper, so the
+    committed notebook still shows something for a reader who has not installed
+    anything.
+    """
+    try:
+        import ipywidgets as W
+    except ImportError:
+        print("  ipywidgets not installed — showing the static stepper instead.")
+        print("  For live scrubbing:  pip install ipywidgets\n")
+        return steps(d)
+    from IPython.display import display as _disp
+
+    m = trained(d)
+    (_, _), (Xte, Yte) = d
+    with torch.no_grad():
+        pred_all = m(Xte[:n])[0].argmax(-1).cpu()
+    truth_all = Yte[:n].cpu()
+    wrong = (pred_all != truth_all).nonzero().flatten().tolist()
+    print(f"  {len(wrong)} of the first {n} test images are misclassified "
+          f"({len(wrong)/n*100:.1f}%)")
+
+    slider = W.IntSlider(value=0, min=0, max=n-1, step=1, description="image",
+                         continuous_update=False, layout=W.Layout(width="420px"))
+    nxt_ok   = W.Button(description="next correct", layout=W.Layout(width="130px"))
+    nxt_bad  = W.Button(description="next mistake", layout=W.Layout(width="130px"),
+                        button_style="warning")
+    out = W.Output()
+
+    def refresh(*_):
+        with out:
+            out.clear_output(wait=True)
+            steps(d, img_i=slider.value)
+
+    def jump(want_wrong):
+        def go(_):
+            i = slider.value
+            for step in range(1, n):
+                j = (i + step) % n
+                if ((j in wrong) if want_wrong else (j not in wrong)):
+                    slider.value = j
+                    return
+        return go
+
+    slider.observe(refresh, names="value")
+    nxt_bad.on_click(jump(True))
+    nxt_ok.on_click(jump(False))
+    _disp(W.VBox([W.HBox([slider, nxt_ok, nxt_bad]), out]))
+    refresh()
+    return slider
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

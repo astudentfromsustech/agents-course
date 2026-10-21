@@ -206,7 +206,14 @@ related, and the more data it gets the less that costs it.
 
 `predict()` draws the whole journey for a single digit in eight panels: input, the 16 patches,
 the token matrix, the final `[CLS]` vector, what `[CLS]` reads at each block, the 10 logits, the
-softmax, and the answer. `steps()` is the click-through version: the same computation as eight collapsible stages, each
+softmax, and the answer. `explore()` is the live version: a slider over the test set that redraws the eight stages as you
+drag, plus **next mistake** / **next correct** buttons. It needs `ipywidgets`
+(`pip install ipywidgets`; Colab has it) and falls back to the static stepper without it, so the
+committed notebook still shows something either way. A widget needs a running kernel, so the
+scrubber is blank until you execute that one cell — everything else in the notebook is readable
+without running anything.
+
+`steps()` is the click-through version: the same computation as eight collapsible stages, each
 with its own figure, and the numbers for that stage in the heading — so the chain reads without
 opening anything. `V.steps(d, img_i=18)` walks a failure. Run `predict()` on a failure too — `V.predict(d, img_i=18)` shows a loopy `3`
 called a `5` at 92.6 % confidence, with `3` not even the runner-up. Worth seeing, because a high
