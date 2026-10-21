@@ -206,7 +206,9 @@ related, and the more data it gets the less that costs it.
 
 `predict()` draws the whole journey for a single digit in eight panels: input, the 16 patches,
 the token matrix, the final `[CLS]` vector, what `[CLS]` reads at each block, the 10 logits, the
-softmax, and the answer. Run it on a failure too — `V.predict(d, img_i=18)` shows a loopy `3`
+softmax, and the answer. `steps()` is the click-through version: the same computation as eight collapsible stages, each
+with its own figure, and the numbers for that stage in the heading — so the chain reads without
+opening anything. `V.steps(d, img_i=18)` walks a failure. Run `predict()` on a failure too — `V.predict(d, img_i=18)` shows a loopy `3`
 called a `5` at 92.6 % confidence, with `3` not even the runner-up. Worth seeing, because a high
 softmax probability means *far from the decision boundary*, not *likely correct*; nothing in the
 architecture measures its own uncertainty.

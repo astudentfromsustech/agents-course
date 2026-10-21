@@ -1593,6 +1593,121 @@ def predict(d, img_i=0, path="prediction.png"):
     plt.close(fig)
     print(f"  wrote {path}   predicted {pred}, true {truth}, "
           f"confidence {float(probs[pred]):.1%}")
+    return path          # must be the path, so fold() can embed the figure
+
+
+def steps(d, img_i=0, open_first=True):
+    """Click through the prediction one stage at a time.
+
+    Each stage is its own collapsible block with its own figure and its own
+    numbers, so you open them in order and watch the image become a digit.
+    Pure HTML -- no ipywidgets, works in Jupyter, Colab and on GitHub.
+    """
+    import base64, builtins, html as _html, io as _io
+    from IPython.display import HTML, display
+
+    m = trained(d)
+    (_, _), (Xte, Yte) = d
+    G, T1, hd = IMG // PATCH, NP + 1, D // HEADS
+    x = Xte[img_i:img_i+1]
+    img = x[0, 0].cpu()
+    truth = int(Yte[img_i])
+
+    with torch.no_grad():
+        tok = m.patch(x)[0].cpu()
+        t = torch.cat([m.cls.expand(1, -1, -1), m.patch(x)], 1) + m.pos
+        after_pos = t[0].cpu().clone()
+        cls_maps, ents = [], []
+        for b in m.blocks:
+            t, a = b(t, True)
+            cls_maps.append(a[0][:, 0, 1:].mean(0).reshape(G, G).cpu())
+            r = a[0][:, 0].mean(0).clamp_min(1e-9)
+            ents.append(float(-(r * r.log2()).sum()))
+        final = m.norm(t)[0, 0].cpu()
+        logits = m.head(m.norm(t)[:, 0])[0].cpu()
+        probs = logits.softmax(-1)
+    pred = int(logits.argmax())
+
+    def png(draw, w, h):
+        fig = plt.figure(figsize=(w, h)); draw(fig)
+        buf = _io.BytesIO(); fig.savefig(buf, format="png", dpi=118, bbox_inches="tight")
+        plt.close(fig)
+        return base64.b64encode(buf.getvalue()).decode()
+
+    def p1(f):
+        a = f.add_subplot(111); a.imshow(img, cmap="gray"); a.set_xticks([]); a.set_yticks([])
+    def p2(f):
+        a = f.add_subplot(111); a.imshow(img, cmap="gray")
+        for k in range(1, G):
+            a.axhline(k*PATCH-.5, color="#e8590c", lw=1.4); a.axvline(k*PATCH-.5, color="#e8590c", lw=1.4)
+        for k in range(NP):
+            r, c = divmod(k, G)
+            a.text(c*PATCH+3, r*PATCH+3.4, str(k), color="#e8590c", fontsize=8,
+                   ha="center", va="center", weight="bold")
+        a.set_xticks([]); a.set_yticks([])
+    def heat(M, ylab):
+        def inner(f):
+            a = f.add_subplot(111); v = float(M.abs().max())
+            a.imshow(M, cmap="RdBu_r", vmin=-v, vmax=v, aspect="auto")
+            a.set_ylabel(ylab, fontsize=8.5); a.set_xlabel("d_model", fontsize=8.5)
+            a.tick_params(labelsize=7)
+        return inner
+    def p5(f):
+        axs = f.subplots(1, LAYERS)
+        for i, (ax, cm) in enumerate(zip(axs, cls_maps)):
+            ax.imshow(img, cmap="gray", alpha=.45, extent=[-.5, G-.5, G-.5, -.5])
+            ax.imshow(cm, cmap="magma", alpha=.75); ax.set_xticks([]); ax.set_yticks([])
+            ax.set_title(f"block {i+1}\n{ents[i]:.2f} bits", fontsize=8.5)
+    def bars(vals, hi=None, xt=None):
+        def inner(f):
+            a = f.add_subplot(111)
+            a.bar(range(len(vals)), vals, color="#1c7ed6" if hi is None else "#adb5bd",
+                  width=1.0 if hi is None else .8)
+            if hi is not None:
+                a.bar([hi], [vals[hi]], color="#e8590c")
+                a.set_xticks(range(len(vals)))
+            a.tick_params(labelsize=7.5)
+            for sp in ("top", "right"): a.spines[sp].set_visible(False)
+            if xt: a.set_xlabel(xt, fontsize=8.5)
+        return inner
+
+    stages = [
+        ("1 · input", f"28x28 = {28*28} pixels, values {float(img.min()):+.2f} to {float(img.max()):+.2f}",
+         png(p1, 2.3, 2.3)),
+        ("2 · cut into patches", f"{NP} patches of {PATCH}x{PATCH} = {PATCH*PATCH} pixels each",
+         png(p2, 2.6, 2.6)),
+        ("3 · each patch -> a token", f"({NP}, {D})  — a learned {PATCH*PATCH} -> {D} matrix",
+         png(heat(tok, "patch"), 6.4, 2.2)),
+        ("4 · + [CLS] + position", f"({T1}, {D})  — row 0 is [CLS], carrying nothing yet",
+         png(heat(after_pos, "token"), 6.4, 2.3)),
+        (f"5 · {LAYERS} blocks of attention",
+         "what [CLS] reads, and how peaked: " + " -> ".join(f"{e:.2f}" for e in ents) + " bits",
+         png(p5, 7.6, 2.1)),
+        ("6 · take row 0", f"the [CLS] vector, {D} numbers, |v| = {float(final.norm()):.2f}",
+         png(bars(final, xt="dimension"), 6.4, 1.9)),
+        ("7 · Linear(64, 10)", "logits: " + "  ".join(f"{v:+.1f}" for v in logits.tolist()),
+         png(bars(logits, hi=pred, xt="digit class"), 5.0, 1.9)),
+        ("8 · softmax -> the answer",
+         f"predicted {pred}, true {truth} — {float(probs[pred]):.1%} confident"
+         f"{'' if pred == truth else '   ** WRONG **'}",
+         png(bars(probs, hi=pred, xt="digit class"), 5.0, 1.9)),
+    ]
+
+    ok = pred == truth
+    head = (f'<div style="font:600 13px system-ui;margin:.2em 0 .5em">'
+            f'click each stage &mdash; image {img_i}, true label {truth}, '
+            f'<span style="color:{"#2f9e44" if ok else "#c92a2a"}">predicted {pred}</span></div>')
+    body = ""
+    for i, (title, sub, b64) in enumerate(stages):
+        body += (f'<details {"open" if (open_first and i == 0) else ""} '
+                 f'style="margin:.18em 0;border-left:2px solid #dee2e6;padding-left:.7em">'
+                 f'<summary style="cursor:pointer;font:600 12.5px system-ui;color:#1c7ed6;'
+                 f'padding:.2em 0;user-select:none">{_html.escape(title)}'
+                 f'<span style="font-weight:400;color:#868e96"> &mdash; {_html.escape(sub)}</span>'
+                 f'</summary>'
+                 f'<img src="data:image/png;base64,{b64}" style="max-width:100%;margin:.3em 0">'
+                 f'</details>')
+    display(HTML(head + body))
     return pred
 
 

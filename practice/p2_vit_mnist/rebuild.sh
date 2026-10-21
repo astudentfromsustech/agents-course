@@ -34,4 +34,21 @@ assert errs == 0, "notebook has error outputs — fix before committing"
 assert not blank, "some code cell produced nothing"
 assert dets >= 10, "the fold blocks are missing"
 PY
+"$BIN/python" - <<'PY'
+import ast
+tree = ast.parse(open("vit_mnist.py").read())
+bad = []
+for n in tree.body:
+    if not isinstance(n, ast.FunctionDef):
+        continue
+    src = ast.unparse(n)
+    takes_path = "path" in [a.arg for a in n.args.args + n.args.kwonlyargs]
+    saves_fig = "savefig" in src                      # a FIGURE function, not load()
+    if takes_path and saves_fig:
+        top = [ast.unparse(r.value) for r in n.body if isinstance(r, ast.Return) and r.value]
+        if top and top[-1] != "path":
+            bad.append(f"{n.name} returns {top[-1]}")
+print(f"  figure functions returning their path: {'all' if not bad else 'PROBLEM'}")
+assert not bad, "fold() cannot embed a figure unless the function returns its path: " + "; ".join(bad)
+PY
 echo "  ok — commit vit_mnist.ipynb with its outputs"
