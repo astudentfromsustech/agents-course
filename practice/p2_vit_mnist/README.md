@@ -47,6 +47,13 @@ Q and K are consumed at `Q.K^T` and never appear again; V is consumed at `A' @ V
 at the foot of the block: **Q and K only make scores, only V carries content** — which is also why
 `d_v` need not equal `d_k`.
 
+`show_all_attention()` draws every map in the model — 4 blocks x 4 heads — plus a column folding
+each block's `[CLS]` row back onto the 4x4 patch grid over the digit, so you can see what the
+classifier's token reads at each depth. By block 2 it has found the stroke. The bright vertical
+stripes in blocks 2-3 are tokens that *every* query reads from. Entropy of the `[CLS]` row
+(uniform = 4.09 bits) goes 3.69 → 3.07 → 2.97 → 3.83: attention sharpens in the middle and
+spreads again at the end.
+
 **`[CLS]` and the positional encoding have no closed-form formula** — both are plain learned
 tensors, entering as one concatenation and one addition:
 

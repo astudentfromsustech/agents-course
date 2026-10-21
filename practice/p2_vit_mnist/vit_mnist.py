@@ -1173,6 +1173,71 @@ def pos_contents(d):
 
 
 
+def show_all_attention(d, img_i=0, path="attention_all_layers.png"):
+    """Every attention map in the model: LAYERS x HEADS, for one image.
+
+    Left block: the full 17x17 map per layer and head. Right column: the
+    [CLS] row of each layer, averaged over heads and folded back onto the
+    patch grid — i.e. what the classifier's token is reading at that depth.
+    """
+    m = trained(d)
+    (_, _), (Xte, Yte) = d
+    G, T1 = IMG // PATCH, NP + 1
+    img = Xte[img_i, 0].cpu()
+    with torch.no_grad():
+        _, maps = m(Xte[img_i:img_i+1], keep_attn=True)       # LAYERS x (1,H,T,T)
+    A = [a[0].cpu() for a in maps]
+
+    fig = plt.figure(figsize=(13.6, 11.2))
+    gs = fig.add_gridspec(LAYERS, HEADS + 2, width_ratios=[1]*HEADS + [.28, 1.15],
+                          hspace=.30, wspace=.18)
+    vmax = max(float(a.max()) for a in A)
+
+    for l in range(LAYERS):
+        for h in range(HEADS):
+            ax = fig.add_subplot(gs[l, h])
+            ax.imshow(A[l][h], cmap="magma", vmin=0, vmax=vmax)
+            ax.set_xticks([]); ax.set_yticks([])
+            if l == 0: ax.set_title(f"head {h}", fontsize=10)
+            if h == 0:
+                ax.set_ylabel(f"block {l+1}", fontsize=10.5, weight="bold")
+                ax.set_yticks([0]); ax.set_yticklabels(["[CLS]"], fontsize=7)
+            # how peaked is this head? entropy of the [CLS] row, in bits
+            r = A[l][h][0].clamp_min(1e-9)
+            ent = float(-(r * r.log2()).sum())
+            ax.set_xlabel(f"{ent:.2f} bits", fontsize=7.5, color="#868e96", labelpad=1.5)
+
+        ax = fig.add_subplot(gs[l, HEADS + 1])                 # what [CLS] reads
+        cls_row = A[l][:, 0, 1:].mean(0).reshape(G, G)
+        ax.imshow(img, cmap="gray", alpha=.45,
+                  extent=[-.5, G-.5, G-.5, -.5])
+        ax.imshow(cls_row, cmap="magma", alpha=.75)
+        ax.set_xticks([]); ax.set_yticks([])
+        if l == 0: ax.set_title(f"[CLS] reads\n(over the {G}x{G} patches)", fontsize=9.5)
+
+    fig.suptitle(f"every attention map in the model — {LAYERS} blocks x {HEADS} heads, "
+                 f"digit {int(Yte[img_i])}", fontsize=12, y=.935)
+    fig.text(.5, .055, "Each panel is one head's 17x17 map; row 0 is [CLS] as the query. "
+             "The number under each is the entropy of that [CLS] row —",
+             ha="center", fontsize=9.6, color="#212529")
+    fig.text(.5, .032, f"low bits = reads a few patches, high = spreads over all 17. "
+             f"Uniform would be {math.log2(T1):.2f} bits.",
+             ha="center", fontsize=9.6, color="#868e96")
+
+    fig.savefig(path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    ents = [[float(-(A[l][h][0].clamp_min(1e-9) *
+                     A[l][h][0].clamp_min(1e-9).log2()).sum()) for h in range(HEADS)]
+            for l in range(LAYERS)]
+    print(f"  wrote {path}")
+    print(f"  [CLS]-row entropy per block (uniform would be {math.log2(T1):.2f} bits):")
+    for l in range(LAYERS):
+        print(f"    block {l+1}:  " + "  ".join(f"{e:.2f}" for e in ents[l])
+              + f"   mean {sum(ents[l])/HEADS:.2f}")
+    return path
+
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own
