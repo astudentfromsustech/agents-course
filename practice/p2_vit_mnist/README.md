@@ -17,6 +17,10 @@ batching, shapes, Q/K/V and the 4 heads, `[CLS]` and position), **3 · how it le
 the loss curve, whether the patch filters move), and **4 · the three measurements** below.
 Figures that need a trained model share one, so the whole notebook runs in ~2 minutes.
 
+Parts 1-3 ship with their **outputs folded** — run all, then expand only what you want to look
+at. The three measurements in part 4 stay open, since they are the point. Click the margin left
+of an output to expand it (Jupyter), or use the arrow (Colab/Lab).
+
 The architecture figure opens the transformer block rather than drawing it as a box: every line
 of the flow with its shape, and orange arrows on the two steps that consume Q, K and V.
 
