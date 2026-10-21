@@ -67,6 +67,19 @@ difference rather than asserting it, as cosine between position slots:
 | learned (this model) | −0.0695 | −0.0003 |
 | sinusoidal formula | +0.9662 | +0.6685 |
 
+`pos_contents()` then shows what is actually in them. `[CLS]` starts at exactly zero and barely
+moves (±0.02, |v| = 0.05) — a placeholder attention fills. Position really is learned (±0.3, 3.4x
+its init), and its per-slot magnitudes are **not uniform**: centre 2x2 mean 0.879, edges 0.408,
+corners 0.226. The centre is ~4x the corners, because on MNIST the digit sits in the middle and
+corner patches are nearly always blank — and blank patches give byte-identical tokens, so
+position is the only thing that can distinguish them. The model spends magnitude where
+distinguishing changes the answer.
+
+That also corrects the cosine measurement above: the table finds no structure in **direction**,
+but it does in **magnitude**. Finally, position is 15% of the content it is added to
+(|pos| 0.48 vs |token| 3.12) — enough to shift a score, not enough to drown the pixels, which is
+why adding works.
+
 A sinusoid is smooth in position **by construction** (`PE(pos+k)` is a fixed rotation of
 `PE(pos)`); a learned table is not obliged to be, and at this scale finds no such structure.
 That is a property of 16 slots and 60,000 images, not a law — large ViTs do develop 2-D structure

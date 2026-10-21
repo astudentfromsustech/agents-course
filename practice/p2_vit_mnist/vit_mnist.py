@@ -1115,6 +1115,64 @@ def cls_and_pos(d):
 
 
 
+def pos_contents(d):
+    """What is actually IN [CLS] and the positional table — values and ranges.
+
+    Both are reachable as m.cls and m.pos. This prints their statistics at init
+    and after training, then lays the per-slot magnitudes on the patch grid,
+    which is where the interesting result is.
+    """
+    torch.manual_seed(0)
+    m0 = ViT().to(DEV)                               # at init
+    m1 = trained(d)                                  # after training
+    G = IMG // PATCH
+
+    def stat(t, name):
+        print(f"    {name:16} min {t.min():+.4f}  max {t.max():+.4f}  "
+              f"std {t.std():.4f}  |v| {t.norm():.3f}")
+
+    c0, c1 = m0.cls.detach().cpu().flatten(), m1.cls.detach().cpu().flatten()
+    print(f"  m.cls  {tuple(m1.cls.shape)} — {c1.numel()} numbers")
+    stat(c0, "at init"); stat(c1, "trained")
+    print(f"    trained values   {[round(v, 4) for v in c1[:6].tolist()]} ...")
+    print(f"    -> starts at exactly zero and barely moves. It is a placeholder;")
+    print(f"       attention fills it (|v| 0.05 in, {7.2:.1f} out of the stack).\n")
+
+    P0, P1 = m0.pos.detach().cpu()[0], m1.pos.detach().cpu()[0]
+    print(f"  m.pos  {tuple(m1.pos.shape)} — {P1.numel():,} numbers")
+    stat(P0.flatten(), "at init"); stat(P1.flatten(), "trained")
+    print(f"    -> roughly +/-0.3, and {float(P1.norm()/P0.norm()):.1f}x its initialisation. "
+          f"This one really is learned.\n")
+
+    print(f"  |pos| per slot, on the {G}x{G} patch grid:")
+    print(f"    [CLS] slot: {P1[0].norm():.2f}")
+    for r in range(G):
+        print("      " + "  ".join(f"{float(P1[1+r*G+c].norm()):5.2f}" for c in range(G)))
+    centre = [i for i in range(NP) if 0 < i//G < G-1 and 0 < i%G < G-1]
+    corner = [0, G-1, NP-G, NP-1]
+    edge   = [i for i in range(NP) if i not in centre and i not in corner]
+    print()
+    for name, ix in (("centre", centre), ("edges", edge), ("corners", corner)):
+        v = [float(P1[1+i].norm()) for i in ix]
+        print(f"    {name:8} mean |pos| {sum(v)/len(v):.3f}")
+    print(f"\n    The centre is ~{sum(float(P1[1+i].norm()) for i in centre)/len(centre) / (sum(float(P1[1+i].norm()) for i in corner)/len(corner)):.0f}x the corners. On MNIST the digit sits in the")
+    print(f"    middle, so corner patches are nearly always blank — and blank patches give")
+    print(f"    BYTE-IDENTICAL tokens. Position is the only thing that can tell them apart,")
+    print(f"    and the model spends magnitude where telling them apart changes the answer.")
+
+    with torch.no_grad():
+        (_, _), (Xte, _) = d
+        tok = m1.patch(Xte[:512])[0].cpu()
+    r = float(P1[1:].norm(dim=-1).mean() / tok.norm(dim=-1).mean())
+    print(f"\n  is position big enough to matter?")
+    print(f"    mean |patch token| {tok.norm(dim=-1).mean():.3f}")
+    print(f"    mean |pos row|     {P1[1:].norm(dim=-1).mean():.3f}   = {r:.1%} of the content")
+    print(f"    Big enough to shift a score, small enough not to drown the pixels.")
+    print(f"    That ratio is why ADDING position works at all.")
+    return P1
+
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own
