@@ -595,6 +595,17 @@ def draw_architecture(d, path="architecture.png"):
              else "norm" if nm.startswith("norm") else "head")
         grp[k] = grp.get(k, 0) + prm.numel()
     TOT = sum(grp.values())
+    bb = {n: q.numel() for n, q in mm.blocks[0].named_parameters()}
+    _qkv = bb["qkv.weight"]
+    _wo  = bb["proj.weight"] + bb["proj.bias"]
+    _mlp = sum(v for k, v in bb.items() if k.startswith("mlp"))
+    _nrm = sum(v for k, v in bb.items() if k.startswith(("n1", "n2")))
+    HOW = {
+        "patch":  f"= {D}x{PATCH*PATCH} + {D}",
+        "clspos": f"= {D} + {NP+1}x{D}",
+        "blocks": f"= ({_qkv:,} qkv + {_wo:,} W\u1d3c + {_mlp:,} MLP + {_nrm} norm) x {LAYERS}",
+        "head":   f"= {D}x10+10  +  2x{D} norm",
+    }
     NB = (N + BS - 1) // BS                      # batches per epoch
     EP = 6
     BLU, BLE, ACC, INK, GRY = "#aec7e8", "#4a6fa5", "#e8590c", "#212529", "#868e96"
@@ -645,6 +656,8 @@ def draw_architecture(d, path="architecture.png"):
     bracket(33, 52, 54, "PatchEmbed", "Conv2d 7x7, stride 7\n(no overlap)")
     dims(42.5, 25.0, "16 patches\n(7 x 7 each = 49 px)")
     ax.text(42.5, 19.4, f"learned: {grp['patch']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
+    ax.text(42.5, 17.6, HOW["patch"], ha="center", fontsize=7.4,
+            color=GRY, family="monospace")
     ax.annotate("", xy=(33, 38), xytext=(25, 38),
                 arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
     for (px, py) in [(6, 48), (6, 30)]:
@@ -666,6 +679,8 @@ def draw_architecture(d, path="architecture.png"):
             f"cls (1, {D}) CONCATENATED\npos ({NP+1}, {D}) ADDED")
     dims(102, 25, f"{NP} + 1 = {NP+1} tokens x {D}\nd_model unchanged")
     ax.text(102, 19.4, f"learned: {grp['cls']+grp['pos']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
+    ax.text(102, 17.6, HOW["clspos"], ha="center", fontsize=7.4,
+            color=GRY, family="monospace")
 
     # 5 ---------------- the blocks, opened up
     BX, BW = 120, 64
@@ -708,6 +723,8 @@ def draw_architecture(d, path="architecture.png"):
             ha="center", fontsize=8.0, color=ACC, style="italic")
     ax.text(BX + BW/2, 17.8, f"learned: {grp['blocks']:,}  ({grp['blocks']//LAYERS:,} x {LAYERS})",
             ha="center", fontsize=9, color=ACC, weight="bold")
+    ax.text(BX + BW/2, 15.9, HOW["blocks"], ha="center", fontsize=7.4,
+            color=GRY, family="monospace")
 
     # 6 ---------------- take the CLS row
     ax.annotate("", xy=(190, 38), xytext=(184, 38), arrowprops=dict(arrowstyle="-|>", lw=1.3, color=INK))
@@ -726,6 +743,8 @@ def draw_architecture(d, path="architecture.png"):
     ax.text(212, 53.5, "OUTPUT", ha="center", fontsize=10.5, weight="bold")
     dims(212, 22.0, "Linear(64, 10)\n-> softmax")
     ax.text(212, 16.4, f"learned: {grp['head']+grp['norm']:,}", ha="center", fontsize=9, color=ACC, weight="bold")
+    ax.text(212, 14.6, HOW["head"], ha="center", fontsize=7.4,
+            color=GRY, family="monospace")
 
     ax.text(113, 13.8, "Drawn for ONE image. Every tensor really carries a leading BATCH "
             "axis \u2014 (256, 17, 64), not (17, 64).", ha="center", fontsize=9.4, color=INK)
@@ -738,7 +757,8 @@ def draw_architecture(d, path="architecture.png"):
     ax.text(113, 7.2, f"d_model = {D} is the RESIDUAL-STREAM WIDTH \u2014 set by PatchEmbed, "
             f"unchanged through all {LAYERS} blocks, read once at the end.",
             ha="center", fontsize=9.4, color="#1c7ed6", weight="bold")
-    ax.text(113, 5.0, f"Orange = LEARNED, {TOT:,} numbers in all, every one updated by the same "
+    ax.text(113, 5.0, f"Orange = LEARNED:  {grp['patch']:,} + {grp['cls']+grp['pos']:,} + {grp['blocks']:,} + "
+            f"{grp['head']+grp['norm']:,}  =  {TOT:,}, every one updated by the same "
             "loss.backward() + opt.step().", ha="center", fontsize=9.4, color=INK)
     ax.text(113, 2.8, "No parameters at all: Q\u00b7K\u1d40, the scaling, softmax, @V, the residual "
             "adds, the [CLS] read-out \u2014 those are fixed arithmetic.",
