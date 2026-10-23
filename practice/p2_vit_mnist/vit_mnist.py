@@ -1785,6 +1785,50 @@ def explore(d, n=500):
     return slider
 
 
+def where_diversity_comes_from(d):
+    """If the split is arbitrary, why do heads differ at all?
+
+    Answer: random (D, d_head) column slices are already near-orthogonal, so
+    each head starts as a different random projection. Training barely changes
+    that. The diversity is inherited from initialisation, not produced by the
+    splitting mechanism -- and not rewarded by the loss either.
+    """
+    import itertools
+    hd = D // HEADS
+    torch.manual_seed(0)
+    m0 = ViT().to(DEV)                              # at init
+    m1 = trained(d)                                 # after training
+
+    def sim(m):
+        out = []
+        for b in m.blocks:
+            Wq = b.qkv.weight[:D].T.detach().cpu()
+            sl = [Wq[:, h*hd:(h+1)*hd].flatten() for h in range(HEADS)]
+            v = [abs(float(F.cosine_similarity(sl[i], sl[j], dim=0)))
+                 for i, j in itertools.combinations(range(HEADS), 2)]
+            out.append(sum(v) / len(v))
+        return out
+
+    a, b_ = sim(m0), sim(m1)
+    print(f"  mean |cosine| between the {HEADS} head slices of W\u1d60")
+    print(f"  (0 = unrelated, 1 = identical)\n")
+    print(f"    {'':10}{'at init':>10}{'trained':>10}{'change':>10}")
+    for l in range(LAYERS):
+        print(f"    block {l+1}   {a[l]:>10.4f}{b_[l]:>10.4f}{b_[l]-a[l]:>+10.4f}")
+    print(f"\n  The slices are ALREADY near-orthogonal before a single gradient step.")
+    print(f"  Each head begins as a different random projection of the same {D} dims,")
+    print(f"  so the split being arbitrary costs nothing. Training then changes the")
+    print(f"  similarity by ~0.01 in either direction -- it does not push them apart.")
+    print(f"\n  Nothing in the loss rewards diversity: no orthogonality penalty, no")
+    print(f"  'be different from your neighbours' term. {HEADS} heads differ for the same")
+    print(f"  reason two randomly initialised neurons differ.")
+    print(f"\n  So the architecture PERMITS specialisation; it does not CAUSE it.")
+    print(f"  Whether heads specialise, and into what, is empirical -- see")
+    print(f"  how_heads_differ(), which finds real differences in block 1 and")
+    print(f"  near-convergence by block {LAYERS}, with no positional specialisation at all.")
+    return a, b_
+
+
 # ---------------------------------------------------------------- experiments
 def exp_train(d):
     torch.manual_seed(0)          # each experiment reproduces on its own

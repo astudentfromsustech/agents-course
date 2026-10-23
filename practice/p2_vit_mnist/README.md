@@ -80,6 +80,14 @@ Q and K are consumed at `Q.K^T` and never appear again; V is consumed at `A' @ V
 at the foot of the block: **Q and K only make scores, only V carries content** — which is also why
 `d_v` need not equal `d_k`.
 
+`where_diversity_comes_from()` answers the obvious objection to "different heads learn different
+features": the split is just columns 0-15 / 16-31 / 32-47 / 48-63, so where does any difference
+come from? From the **initialisation**. Random `(64,16)` column slices are already near-orthogonal
+(|cosine| ~0.02-0.04) before a single gradient step, so each head begins as a different random
+projection and an arbitrary cut point costs nothing. Training then moves that similarity by about
+±0.01 — it does **not** push them apart, because nothing in the loss rewards diversity. The
+architecture *permits* specialisation; it does not *cause* it.
+
 `how_heads_differ()` answers what the maps only suggest, measured over 1,024 images. Three axes,
 the first a negative result: the heads do **not** specialise by position — uniform attention gives
 a mean offset of 1.50 and all 16 heads measure 1.47-1.53 with preferred direction ~(0,0), so none
